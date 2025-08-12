@@ -79,7 +79,9 @@ export default function HomeScreen() {
     setSearchResults(filtered);
   };
 
-  const useFallbackImage = videoError || Platform.OS === 'android' || windowWidth < 768;
+  const useFallbackImage =
+  videoError || Platform.OS === 'android' || Platform.OS === 'web' || windowWidth < 768;
+
   const backgroundColor = isDarkMode ? '#111' : '#f9f9f9';
   const textColor = isDarkMode ? '#eee' : '#111';
 
