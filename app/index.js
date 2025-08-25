@@ -116,21 +116,22 @@ export default function HomeScreen() {
     }
   };
 
-  // ── Responsive hero height (16:9) ─────────────────────────────────────────
-  const heroHeight = Math.max(220, Math.min(550, Math.round(width * 9 / 16)));
+  // ── Media setup ────────────────────────────────────────────────────────────
   const isSmall = width < 480;
 
-  // Fallback image uniquement si la vidéo échoue
+  // ✅ Fallback image uniquement si la vidéo échoue vraiment
   const useFallbackImage = videoError;
 
-  // Image distante unique (poster + fallback)
+  // ✅ Image distante unique (poster + fallback)
   const HERO_IMG = {
     uri: 'https://upload.wikimedia.org/wikipedia/commons/5/52/Sunmoon-university.jpg',
   };
 
-  // Vidéo: source principale + secours
-  const PRIMARY = 'https://lily.sunmoon.ac.kr/images/main/main_20250723_pc.mp4';
-  const SECONDARY = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4';
+  // (Optionnel) 2e source vidéo si la première échoue
+  const PRIMARY =
+    'https://lily.sunmoon.ac.kr/images/main/main_20250723_pc.mp4';
+  const SECONDARY =
+    'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'; // remplace par ton propre MP4 si besoin
   const [videoSrc, setVideoSrc] = useState({ uri: PRIMARY });
 
   const bgTop = isDarkMode ? '#0a0a0a' : '#f6f7fb';
@@ -144,9 +145,13 @@ export default function HomeScreen() {
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <TopNavbar />
 
-        <View style={[styles.heroWrapper, { height: heroHeight }]}>
+        <View style={styles.heroWrapper}>
           {useFallbackImage ? (
-            <ImageBackground source={HERO_IMG} style={styles.heroVideo} resizeMode="cover">
+            <ImageBackground
+              source={HERO_IMG}
+              style={styles.heroVideo}
+              resizeMode="cover"
+            >
               <View style={[styles.heroOverlay, isSmall && styles.heroOverlaySm]}>
                 <HeroContent
                   router={router}
@@ -166,11 +171,15 @@ export default function HomeScreen() {
                 isLooping
                 isMuted
                 usePoster
-                posterSource={HERO_IMG}
+                posterSource={HERO_IMG} // même image distante comme poster
                 onError={(e) => {
                   console.warn('Video error:', e);
-                  if (videoSrc.uri !== SECONDARY) setVideoSrc({ uri: SECONDARY });
-                  else setVideoError(true);
+                  // tente une 2e source, sinon fallback image
+                  if (videoSrc.uri !== SECONDARY) {
+                    setVideoSrc({ uri: SECONDARY });
+                  } else {
+                    setVideoError(true);
+                  }
                 }}
               />
               <View style={[styles.heroOverlay, isSmall && styles.heroOverlaySm]}>
@@ -245,15 +254,13 @@ const HeroContent = ({ router, isDarkMode, toggleTheme, onSearch }) => {
     Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start();
   };
 
-  const isSmall = useWindowDimensions().width < 480;
-
   return (
     <View style={styles.heroContent}>
       <View style={styles.textBlock}>
-        <Text style={[styles.titleLarge, isSmall && { fontSize: 24, lineHeight: 32 }]}>
+        <Text style={styles.titleLarge}>
           Apply to Korean universities <Text style={styles.highlight}>with KOEDU Bridge</Text>
         </Text>
-        <Text style={[styles.description, isSmall && { fontSize: 14, lineHeight: 20 }]}>
+        <Text style={styles.description}>
           Choose your program. Submit your application. Start your journey.
         </Text>
 
@@ -300,6 +307,7 @@ const styles = StyleSheet.create({
   },
   heroWrapper: {
     width: '100%',
+    height: 550,
     position: 'relative',
     backgroundColor: '#000',
     overflow: 'hidden',
