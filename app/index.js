@@ -13,7 +13,6 @@ import React, { useEffect, useState } from 'react';
 import {
   Animated,
   ImageBackground,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -117,19 +116,23 @@ export default function HomeScreen() {
     }
   };
 
-  // ── Responsive media choices ───────────────────────────────────────────────
+  // ── Media setup ────────────────────────────────────────────────────────────
   const isSmall = width < 480;
-  const isTabletDown = width < 768;
 
-  // On Android or small screens, prefer the lightweight image.
-  const useFallbackImage = videoError || Platform.OS === 'android' || isTabletDown;
+  // ✅ Fallback image uniquement si la vidéo échoue vraiment
+  const useFallbackImage = videoError;
 
-  // Small/light image for native or very small screens
-  const useSmallImage = Platform.OS !== 'web' || isSmall;
-  const HERO_IMG_MOBILE = require('../assets/images/hero-mobile.jpg.png'); // add this file
-  const HERO_IMG_DESKTOP = {
+  // ✅ Image distante unique (poster + fallback)
+  const HERO_IMG = {
     uri: 'https://upload.wikimedia.org/wikipedia/commons/5/52/Sunmoon-university.jpg',
   };
+
+  // (Optionnel) 2e source vidéo si la première échoue
+  const PRIMARY =
+    'https://lily.sunmoon.ac.kr/images/main/main_20250723_pc.mp4';
+  const SECONDARY =
+    'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'; // remplace par ton propre MP4 si besoin
+  const [videoSrc, setVideoSrc] = useState({ uri: PRIMARY });
 
   const bgTop = isDarkMode ? '#0a0a0a' : '#f6f7fb';
   const bgBottom = isDarkMode ? '#1a1a1a' : '#eef2f7';
@@ -145,7 +148,7 @@ export default function HomeScreen() {
         <View style={styles.heroWrapper}>
           {useFallbackImage ? (
             <ImageBackground
-              source={useSmallImage ? HERO_IMG_MOBILE : HERO_IMG_DESKTOP}
+              source={HERO_IMG}
               style={styles.heroVideo}
               resizeMode="cover"
             >
@@ -161,15 +164,23 @@ export default function HomeScreen() {
           ) : (
             <>
               <Video
-                source={{ uri: 'https://lily.sunmoon.ac.kr/images/main/main_20250723_pc.mp4' }}
+                source={videoSrc}
                 style={styles.heroVideo}
                 resizeMode="cover"
                 shouldPlay
                 isLooping
                 isMuted
                 usePoster
-                posterSource={useSmallImage ? HERO_IMG_MOBILE : HERO_IMG_DESKTOP}
-                onError={(e) => { console.error('video error', e); setVideoError(true); }}
+                posterSource={HERO_IMG} // même image distante comme poster
+                onError={(e) => {
+                  console.warn('Video error:', e);
+                  // tente une 2e source, sinon fallback image
+                  if (videoSrc.uri !== SECONDARY) {
+                    setVideoSrc({ uri: SECONDARY });
+                  } else {
+                    setVideoError(true);
+                  }
+                }}
               />
               <View style={[styles.heroOverlay, isSmall && styles.heroOverlaySm]}>
                 <HeroContent
