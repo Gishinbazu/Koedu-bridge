@@ -1,13 +1,15 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isSignedIn() { return request.auth != null; }
+    function isSelf(uid) { return isSignedIn() && request.auth.uid == uid; }
+    function isAdmin() { return isSignedIn() && (request.auth.token.admin == true); }
 
-    // Collections vitrine que tu gardes
-    match /events/{id}   { allow read: if true; allow write: if false; }
-    match /news/{id}     { allow read: if true; allow write: if false; }
-    match /programs/{id} { allow read: if true; allow write: if false; }
-
-    // Tout le reste interdit
-    match /{document=**} { allow read, write: if false; }
+    match /users/{uid} {
+      allow read: if isSelf(uid) || isAdmin();
+      allow create: if isSelf(uid) && request.resource.data.role == "user";
+      allow update: if isSelf(uid) && request.resource.data.role == resource.data.role;
+      allow write: if isAdmin();
+    }
   }
 }

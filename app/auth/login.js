@@ -1,6 +1,12 @@
+// app/auth/login.js
 import { useRouter } from 'expo-router';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import {
+  browserLocalPersistence,
+  setPersistence,
+  signInWithEmailAndPassword,
+  signOut,
+} from 'firebase/auth';
+import { doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -27,61 +33,103 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!email || !password) {
+    const emailClean = (email || '').trim().toLowerCase();
+    if (!emailClean || !password) {
       Alert.alert('Erreur', 'Veuillez remplir tous les champs.');
       return;
     }
 
     setLoading(true);
-
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const uid = userCredential.user.uid;
-
-      const userDocRef = doc(db, 'users', uid);
-      const userDoc = await getDoc(userDocRef);
-
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        const role = userData.role || 'user';
-        const isNewUser = userData.isNewUser || false;
-
-        if (isNewUser) {
-          await updateDoc(userDocRef, { isNewUser: false });
-          router.replace('/onboarding');
-        } else if (role === 'superadmin' || role === 'admin') {
-          router.replace('/admin');
-        } else if (role === 'manager') {
-          router.replace('/manager');
-        } else {
-          router.replace('/user/dashboard');
-        }
-      } else {
-        Alert.alert('Erreur', 'Utilisateur introuvable dans la base.');
+      // 0) Si on était connecté anonymement quelque part, on ferme la session
+      if (auth.currentUser?.isAnonymous) {
+        try { await signOut(auth); } catch {}
       }
-    } catch (error) {
-      console.error('Erreur de connexion :', error);
-      Alert.alert('Erreur', 'Identifiants invalides.');
+
+      // 1) Persistance (Web uniquement)
+      try { await setPersistence(auth, browserLocalPersistence); } catch {}
+
+      // 2) Auth email + mot de passe
+      const { user } = await signInWithEmailAndPassword(auth, emailClean, password);
+      console.log('[auth] signed-in uid =', user.uid);
+
+      // 3) (Optionnel) refresh des claims
+      try { await user.getIdToken(true); } catch {}
+
+      // 4) Lecture stricte du profil Firestore (NE PAS créer ici)
+      const userRef = doc(db, 'users', auth.currentUser.uid);
+      let snap;
+      try {
+        snap = await getDoc(userRef);
+      } catch (e) {
+        console.error('[login/getDoc]', e?.code, e?.message);
+        throw e; // remonte au catch
+      }
+
+      if (!snap.exists()) {
+        // Pas de doc → refuser la connexion et déconnecter l’utilisateur
+        try { await signOut(auth); } catch {}
+        Alert.alert(
+          'Compte non configuré',
+          "Aucun profil 'users/{uid}' n'existe pour cet utilisateur. Inscris-toi ou contacte un admin."
+        );
+        return;
+      }
+
+      // 5) Mise à jour non bloquante
+      try { await updateDoc(userRef, { lastLoginAt: serverTimestamp() }); }
+      catch (e) { console.warn('[login/updateDoc lastLoginAt]', e?.code, e?.message); }
+
+      // 6) Routage selon le rôle
+      const data = snap.data() || {};
+      const role = data.role || 'user';
+      if (role === 'superadmin' || role === 'admin') router.replace('/admin');
+      else if (role === 'manager') router.replace('/manager');
+      else router.replace('/user/dashboard');
+
+    } catch (e) {
+      console.error('[login] error', e?.code, e?.message);
+      let msg = 'Identifiants invalides.';
+      if (
+        e?.code === 'auth/invalid-email' ||
+        e?.code === 'auth/wrong-password' ||
+        e?.code === 'auth/user-not-found' ||
+        e?.code === 'auth/invalid-credential'
+      ) msg = 'Email ou mot de passe incorrect.';
+      else if (e?.code === 'auth/too-many-requests')
+        msg = 'Trop de tentatives. Réessayez plus tard.';
+      else if (e?.code === 'auth/unauthorized-domain')
+        msg = "Domaine non autorisé (Firebase Auth → Settings → Authorized domains).";
+      else if (e?.code === 'permission-denied')
+        msg = "Permissions Firestore insuffisantes pour lire 'users/{uid}'.";
+
+      Alert.alert('Connexion impossible', msg);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <ImageBackground source={require('../../assets/images/sunrise.jpg')} style={styles.bg} resizeMode="cover">
+    <ImageBackground
+      source={require('../../assets/images/sunrise.jpg')}
+      style={styles.bg}
+      resizeMode="cover"
+    >
       <StatusBar barStyle="light-content" />
       <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardView}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardView}
+        >
           <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
             <View style={styles.cardContainer}>
-
-              {/* Left panel */}
+              {/* Panneau gauche */}
               <View style={styles.leftPanel}>
                 <Text style={styles.logo}>🪄 KOEDU Bridge</Text>
-                <Text style={styles.welcome}>Welcome!</Text>
-                <Text style={styles.subWelcome}>To Our New Platform</Text>
+                <Text style={styles.welcome}>Bienvenue !</Text>
+                <Text style={styles.subWelcome}>Connectez-vous à la plateforme</Text>
                 <Text style={styles.description}>
-                  Explore study opportunities in Korea and access your dashboard, applications, and more.
+                  Accédez à votre espace : candidatures, tableau de bord, documents…
                 </Text>
                 <View style={styles.socialRow}>
                   <Text style={styles.socialIcon}>🔗</Text>
@@ -90,9 +138,9 @@ export default function LoginScreen() {
                 </View>
               </View>
 
-              {/* Right panel */}
+              {/* Panneau droit */}
               <View style={styles.rightPanel}>
-                <Text style={styles.title}>Sign In</Text>
+                <Text style={styles.title}>Se connecter</Text>
 
                 <TextInput
                   placeholder="Email"
@@ -102,17 +150,19 @@ export default function LoginScreen() {
                   onChangeText={setEmail}
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  autoCorrect={false}
                 />
 
                 <View style={styles.passwordContainer}>
                   <TextInput
-                    placeholder="Password"
+                    placeholder="Mot de passe"
                     placeholderTextColor="#ccc"
                     style={styles.passwordInput}
                     value={password}
                     onChangeText={setPassword}
                     secureTextEntry={secure}
                     autoCapitalize="none"
+                    autoCorrect={false}
                   />
                   <TouchableOpacity onPress={() => setSecure(!secure)}>
                     <Text style={styles.eye}>{secure ? '👁️' : '🙈'}</Text>
@@ -120,25 +170,28 @@ export default function LoginScreen() {
                 </View>
 
                 <View style={styles.optionsRow}>
-                  <Text style={styles.checkboxText}>☑ Remember me</Text>
+                  <Text style={styles.checkboxText}>☑ Se souvenir de moi</Text>
                   <TouchableOpacity onPress={() => router.push('/auth/forgot-password')}>
-                    <Text style={styles.forgotText}>Forgot password?</Text>
+                    <Text style={styles.forgotText}>Mot de passe oublié ?</Text>
                   </TouchableOpacity>
                 </View>
 
-                <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
+                <TouchableOpacity
+                  style={[styles.button, loading && { opacity: 0.7 }]}
+                  onPress={handleLogin}
+                  disabled={loading}
+                >
                   {loading ? (
                     <ActivityIndicator size="small" color="#fff" />
                   ) : (
-                    <Text style={styles.buttonText}>Sign In</Text>
+                    <Text style={styles.buttonText}>Se connecter</Text>
                   )}
                 </TouchableOpacity>
 
                 <TouchableOpacity onPress={() => router.push('/auth/signup')}>
-                  <Text style={styles.link}>Don't have an account? Sign up</Text>
+                  <Text style={styles.link}>Pas de compte ? S’inscrire</Text>
                 </TouchableOpacity>
               </View>
-
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -148,23 +201,10 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  bg: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-  },
-  safeArea: {
-    flex: 1,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  scroll: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 32,
-  },
+  bg: { flex: 1, width: '100%', height: '100%' },
+  safeArea: { flex: 1 },
+  keyboardView: { flex: 1 },
+  scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 32 },
   cardContainer: {
     flexDirection: 'row',
     backgroundColor: 'rgba(255,255,255,0.1)',
@@ -175,55 +215,15 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 10,
   },
-  leftPanel: {
-    flex: 1,
-    padding: 20,
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-  },
-  logo: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 20,
-  },
-  welcome: {
-    color: '#fff',
-    fontSize: 32,
-    fontWeight: 'bold',
-  },
-  subWelcome: {
-    color: '#fff',
-    fontSize: 16,
-    marginBottom: 16,
-  },
-  description: {
-    color: '#ddd',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  socialRow: {
-    flexDirection: 'row',
-    marginTop: 20,
-    gap: 16,
-  },
-  socialIcon: {
-    fontSize: 22,
-    color: '#fff',
-  },
-  rightPanel: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    padding: 24,
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    color: '#fff',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
+  leftPanel: { flex: 1, padding: 20, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.4)' },
+  logo: { color: '#fff', fontSize: 20, fontWeight: 'bold', marginBottom: 20 },
+  welcome: { color: '#fff', fontSize: 32, fontWeight: 'bold' },
+  subWelcome: { color: '#fff', fontSize: 16, marginBottom: 16 },
+  description: { color: '#ddd', fontSize: 14, lineHeight: 20 },
+  socialRow: { flexDirection: 'row', marginTop: 20, gap: 16 },
+  socialIcon: { fontSize: 22, color: '#fff' },
+  rightPanel: { flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', padding: 24, justifyContent: 'center' },
+  title: { fontSize: 26, fontWeight: 'bold', color: '#fff', textAlign: 'center', marginBottom: 24 },
   input: {
     height: 48,
     backgroundColor: '#fff',
@@ -242,46 +242,12 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     height: 48,
   },
-  passwordInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#000',
-  },
-  eye: {
-    fontSize: 18,
-    marginLeft: 10,
-  },
-  optionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  checkboxText: {
-    color: '#ccc',
-    fontSize: 14,
-  },
-  forgotText: {
-    color: '#ccc',
-    fontSize: 14,
-    textDecorationLine: 'underline',
-  },
-  button: {
-    backgroundColor: '#f42b5d',
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginTop: 10,
-  },
-  buttonText: {
-    color: '#fff',
-    fontWeight: '700',
-    textAlign: 'center',
-    fontSize: 16,
-  },
-  link: {
-    textAlign: 'center',
-    marginTop: 18,
-    color: '#ccc',
-    fontSize: 14,
-    textDecorationLine: 'underline',
-  },
+  passwordInput: { flex: 1, fontSize: 16, color: '#000' },
+  eye: { fontSize: 18, marginLeft: 10 },
+  optionsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  checkboxText: { color: '#ccc', fontSize: 14 },
+  forgotText: { color: '#ccc', fontSize: 14, textDecorationLine: 'underline' },
+  button: { backgroundColor: '#f42b5d', paddingVertical: 14, borderRadius: 12, marginTop: 10 },
+  buttonText: { color: '#fff', fontWeight: '700', textAlign: 'center', fontSize: 16 },
+  link: { textAlign: 'center', marginTop: 18, color: '#ccc', fontSize: 14, textDecorationLine: 'underline' },
 });
