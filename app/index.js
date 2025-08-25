@@ -12,7 +12,6 @@ import { collection, getDocs, query } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import {
   Animated,
-  Dimensions,
   ImageBackground,
   Platform,
   Pressable,
@@ -20,6 +19,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
 
 import AcademicInfoSection from '../components/AcademicInfoSection';
@@ -33,8 +33,6 @@ import TestimonialsCarousel from '../components/TestimonialsCarousel';
 import TopNavbar from '../components/TopNavbar';
 
 import { db } from '../services/firebase';
-
-const windowWidth = Dimensions.get('window').width;
 
 const ContentWrapper = ({ children }) => (
   <View style={styles.wrapper}>{children}</View>
@@ -72,6 +70,7 @@ export default function HomeScreen() {
   const [searchResults, setSearchResults] = useState([]);
   const [videoError, setVideoError] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const { width } = useWindowDimensions();
 
   const [fontsLoaded] = useFonts({
     Merriweather_400Regular,
@@ -118,9 +117,19 @@ export default function HomeScreen() {
     }
   };
 
-  // ▶️ Show video on web; fall back only on Android, small width or error
-  const useFallbackImage =
-    videoError || Platform.OS === 'android' || windowWidth < 768;
+  // ── Responsive media choices ───────────────────────────────────────────────
+  const isSmall = width < 480;
+  const isTabletDown = width < 768;
+
+  // On Android or small screens, prefer the lightweight image.
+  const useFallbackImage = videoError || Platform.OS === 'android' || isTabletDown;
+
+  // Small/light image for native or very small screens
+  const useSmallImage = Platform.OS !== 'web' || isSmall;
+  const HERO_IMG_MOBILE = require('../assets/images/hero-mobile.jpg.png'); // add this file
+  const HERO_IMG_DESKTOP = {
+    uri: 'https://upload.wikimedia.org/wikipedia/commons/5/52/Sunmoon-university.jpg',
+  };
 
   const bgTop = isDarkMode ? '#0a0a0a' : '#f6f7fb';
   const bgBottom = isDarkMode ? '#1a1a1a' : '#eef2f7';
@@ -136,11 +145,11 @@ export default function HomeScreen() {
         <View style={styles.heroWrapper}>
           {useFallbackImage ? (
             <ImageBackground
-              source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/5/52/Sunmoon-university.jpg' }}
+              source={useSmallImage ? HERO_IMG_MOBILE : HERO_IMG_DESKTOP}
               style={styles.heroVideo}
               resizeMode="cover"
             >
-              <View style={styles.heroOverlay}>
+              <View style={[styles.heroOverlay, isSmall && styles.heroOverlaySm]}>
                 <HeroContent
                   router={router}
                   isDarkMode={isDarkMode}
@@ -159,10 +168,10 @@ export default function HomeScreen() {
                 isLooping
                 isMuted
                 usePoster
-                posterSource={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/5/52/Sunmoon-university.jpg' }}
+                posterSource={useSmallImage ? HERO_IMG_MOBILE : HERO_IMG_DESKTOP}
                 onError={(e) => { console.error('video error', e); setVideoError(true); }}
               />
-              <View style={styles.heroOverlay}>
+              <View style={[styles.heroOverlay, isSmall && styles.heroOverlaySm]}>
                 <HeroContent
                   router={router}
                   isDarkMode={isDarkMode}
@@ -297,12 +306,15 @@ const styles = StyleSheet.create({
   heroVideo: { ...StyleSheet.absoluteFillObject, zIndex: 0 },
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.35)', // slightly lighter so video shows through
+    backgroundColor: 'rgba(0,0,0,0.35)', // show video through
     zIndex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
     paddingVertical: 40,
+  },
+  heroOverlaySm: {
+    backgroundColor: 'rgba(0,0,0,0.45)', // a bit stronger on small screens
   },
   heroContent: { maxWidth: 700, alignItems: 'center', width: '100%', paddingHorizontal: 16 },
   textBlock: { alignItems: 'center', width: '100%' },
