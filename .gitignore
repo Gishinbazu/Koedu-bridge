@@ -1,39 +1,76 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+# Learn more: https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# dependencies
+#####################################
+# Dépendances & artefacts de build
+#####################################
 node_modules/
-
-# Expo
-.expo/
 dist/
 web-build/
-expo-env.d.ts
+.cache/
+*.tsbuildinfo
 
-# Native
-.kotlin/
-*.orig.*
+#####################################
+# Expo / Metro
+#####################################
+.expo/
+.expo-shared/
+expo-env.d.ts
+.metro-health-check*
+
+#####################################
+# Logs
+#####################################
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+pnpm-debug.log*
+*.log
+
+#####################################
+# Environnements (ne PAS commit les secrets)
+#####################################
+.env
+.env*.local
+.env.*.local
+
+# Garder un gabarit traçable pour l’équipe
+!.env.example
+
+#####################################
+# Plateformes natives (ignorer si projet Expo "managed")
+# Si tu passes en workflow "bare", tu préféreras les versionner.
+#####################################
+android/
+ios/
+
+# Android/iOS clés & profils
 *.jks
+*.keystore
 *.p8
 *.p12
 *.key
 *.mobileprovision
+*.orig.*
 
-# Metro
-.metro-health-check*
+# Kotlin cache
+.kotlin/
 
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
-
-# macOS
+#####################################
+# OS / éditeurs
+#####################################
 .DS_Store
+Thumbs.db
 *.pem
+.idea/
+.vscode/
 
-# local env files
-.env*.local
+#####################################
+# Hébergeurs / outils
+#####################################
+.vercel/
+.eleventy.js
 
-# typescript
-*.tsbuildinfo
-
-app-example
+#####################################
+# Divers projet
+#####################################
+app-example/

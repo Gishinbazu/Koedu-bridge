@@ -1,0 +1,33 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Fichiers publics (ex: images utilisées par la vitrine)
+    match /public/{allPaths=**} {
+      allow read: if true;      // lecture publique
+      allow write: if false;    // pas d'upload public
+    }
+
+    // Uploads par utilisateur dans user_uploads/{uid}/...
+    match /user_uploads/{uid}/{allPaths=**} {
+      // (mets plutôt "read: if request.auth != null && request.auth.uid == uid"
+      // si tu veux que ce ne soit pas public)
+      allow read: if true;
+
+      allow write: if request.auth != null
+                   && request.auth.uid == uid
+                   && request.resource.size < 10 * 1024 * 1024
+                   && ( request.resource.contentType.matches('image/.*')
+                        || request.resource.contentType == 'application/pdf' );
+    }
+
+    // Zone admin (si tu en as besoin)
+    match /admin/{allPaths=**} {
+      allow read: if true;  // ou restreins: request.auth.token.admin == true
+      allow write: if request.auth != null && request.auth.token.admin == true;
+    }
+
+    // Par défaut
+    match /{allPaths=**} { allow read, write: if false; }
+  }
+}
