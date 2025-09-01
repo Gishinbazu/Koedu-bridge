@@ -9,19 +9,9 @@ import {
 import { doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  ImageBackground,
-  KeyboardAvoidingView,
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+  ActivityIndicator, Alert, ImageBackground, KeyboardAvoidingView, Platform,
+  SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput,
+  TouchableOpacity, View,
 } from 'react-native';
 import { auth, db } from '../../services/firebase';
 
@@ -31,6 +21,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [secure, setSecure] = useState(true);
   const [loading, setLoading] = useState(false);
+  const isWeb = Platform.OS === 'web';
 
   const handleLogin = async () => {
     const emailClean = (email || '').trim().toLowerCase();
@@ -41,33 +32,20 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      // 0) Si on était connecté anonymement quelque part, on ferme la session
       if (auth.currentUser?.isAnonymous) {
         try { await signOut(auth); } catch {}
       }
-
-      // 1) Persistance (Web uniquement)
-      try { await setPersistence(auth, browserLocalPersistence); } catch {}
-
-      // 2) Auth email + mot de passe
-      const { user } = await signInWithEmailAndPassword(auth, emailClean, password);
-      console.log('[auth] signed-in uid =', user.uid);
-
-      // 3) (Optionnel) refresh des claims
-      try { await user.getIdToken(true); } catch {}
-
-      // 4) Lecture stricte du profil Firestore (NE PAS créer ici)
-      const userRef = doc(db, 'users', auth.currentUser.uid);
-      let snap;
-      try {
-        snap = await getDoc(userRef);
-      } catch (e) {
-        console.error('[login/getDoc]', e?.code, e?.message);
-        throw e; // remonte au catch
+      if (isWeb) {
+        try { await setPersistence(auth, browserLocalPersistence); } catch {}
       }
 
+      const { user } = await signInWithEmailAndPassword(auth, emailClean, password);
+      try { await user.getIdToken(true); } catch {}
+
+      const userRef = doc(db, 'users', user.uid);
+      const snap = await getDoc(userRef); // ← pas d’App Check ici
+
       if (!snap.exists()) {
-        // Pas de doc → refuser la connexion et déconnecter l’utilisateur
         try { await signOut(auth); } catch {}
         Alert.alert(
           'Compte non configuré',
@@ -76,13 +54,9 @@ export default function LoginScreen() {
         return;
       }
 
-      // 5) Mise à jour non bloquante
-      try { await updateDoc(userRef, { lastLoginAt: serverTimestamp() }); }
-      catch (e) { console.warn('[login/updateDoc lastLoginAt]', e?.code, e?.message); }
+      try { await updateDoc(userRef, { lastLoginAt: serverTimestamp() }); } catch {}
 
-      // 6) Routage selon le rôle
-      const data = snap.data() || {};
-      const role = data.role || 'user';
+      const role = (snap.data()?.role) || 'user';
       if (role === 'superadmin' || role === 'admin') router.replace('/admin');
       else if (role === 'manager') router.replace('/manager');
       else router.replace('/user/dashboard');
@@ -90,19 +64,19 @@ export default function LoginScreen() {
     } catch (e) {
       console.error('[login] error', e?.code, e?.message);
       let msg = 'Identifiants invalides.';
-      if (
-        e?.code === 'auth/invalid-email' ||
-        e?.code === 'auth/wrong-password' ||
-        e?.code === 'auth/user-not-found' ||
-        e?.code === 'auth/invalid-credential'
-      ) msg = 'Email ou mot de passe incorrect.';
-      else if (e?.code === 'auth/too-many-requests')
-        msg = 'Trop de tentatives. Réessayez plus tard.';
-      else if (e?.code === 'auth/unauthorized-domain')
-        msg = "Domaine non autorisé (Firebase Auth → Settings → Authorized domains).";
-      else if (e?.code === 'permission-denied')
-        msg = "Permissions Firestore insuffisantes pour lire 'users/{uid}'.";
+      const code = e?.code || '';
 
+      if (
+        code === 'auth/invalid-email' ||
+        code === 'auth/wrong-password' ||
+        code === 'auth/user-not-found' ||
+        code === 'auth/invalid-credential'
+      ) msg = 'Email ou mot de passe incorrect.';
+      else if (code === 'auth/too-many-requests') msg = 'Trop de tentatives. Réessayez plus tard.';
+      else if (code === 'auth/unauthorized-domain')
+        msg = "Domaine non autorisé (Firebase Auth → Settings → Authorized domains).";
+      else if (code === 'permission-denied')
+        msg = "Permissions Firestore insuffisantes pour lire 'users/{uid}'.";
       Alert.alert('Connexion impossible', msg);
     } finally {
       setLoading(false);

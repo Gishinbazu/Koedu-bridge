@@ -1,15 +1,52 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isSignedIn() { return request.auth != null; }
-    function isSelf(uid) { return isSignedIn() && request.auth.uid == uid; }
-    function isAdmin() { return isSignedIn() && (request.auth.token.admin == true); }
 
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // Lit le rôle du user connecté depuis son propre doc
+    function myRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAdmin() {
+      return signedIn() && (myRole() == 'admin' || myRole() == 'superadmin');
+    }
+
+    function isManager() {
+      return signedIn() && (myRole() == 'manager' || isAdmin());
+    }
+
+    // ---- users collection ----
     match /users/{uid} {
-      allow read: if isSelf(uid) || isAdmin();
-      allow create: if isSelf(uid) && request.resource.data.role == "user";
-      allow update: if isSelf(uid) && request.resource.data.role == resource.data.role;
-      allow write: if isAdmin();
+      // Un utilisateur peut créer son propre doc (ex: onboarding)
+      allow create: if isSelf(uid);
+
+      // Lecture : soi-même, ou admin/superadmin
+      allow get, list: if isSelf(uid) || isAdmin();
+
+      // Mise à jour : soi-même, manager (si tu veux), ou admin/superadmin
+      allow update: if isSelf(uid) || isManager() || isAdmin();
+
+      // Suppression : admin/superadmin uniquement
+      allow delete: if isAdmin();
+    }
+
+    // ---- exemples pour d'autres collections (optionnel) ----
+    // match /applications/{docId} {
+    //   allow read, write: if signedIn(); // à affiner selon ton modèle
+    // }
+
+    // Par défaut : rien d'autre n'est accessible
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
