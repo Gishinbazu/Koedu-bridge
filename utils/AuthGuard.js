@@ -1,106 +1,95 @@
 // utils/AuthGuard.js
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { useEffect, useState } from 'react';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { useEffect, useRef, useState } from 'react';
 import { auth, db } from '../services/firebase';
 
-/**
- * ✅ Hook React pour protéger les pages : redirige vers /login si non connecté
- * et récupère le rôle depuis Firestore (user/admin/superadmin)
- */
-export const useAuthGuard = () => {
+export const useAuthGuard = (opts = {}) => {
+  const { requireAdmin = false, requireSuperadmin = false } = opts;
+
   const [user, setUser] = useState(null);
-  const [role, setRole] = useState(null); // 'user', 'admin', 'superadmin'
+  const [role, setRole] = useState(null);      // 'user' | 'admin' | 'superadmin'
   const [loading, setLoading] = useState(true);
+  const [hasProfile, setHasProfile] = useState(true);
+
   const router = useRouter();
+  const pathname = usePathname();
+  const mounted = useRef(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        setUser(firebaseUser);
+    mounted.current = true;
 
-        try {
-          const userRef = doc(db, 'users', firebaseUser.uid);
-          const snap = await getDoc(userRef);
+    const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      if (!mounted.current) return;
 
-          if (snap.exists()) {
-            const userData = snap.data();
-            const currentRole = userData.role || 'user';
-            setRole(currentRole);
-            console.log('✅ Rôle utilisateur détecté :', currentRole);
-          } else {
-            console.warn('⚠️ Aucun document utilisateur trouvé.');
-            setRole('user');
-          }
-        } catch (e) {
-          console.error('❌ Erreur lors du chargement du rôle utilisateur :', e);
-          setRole('user');
+      if (!firebaseUser) {
+        setUser(null);
+        setRole(null);
+        setHasProfile(true);
+        setLoading(false);
+
+        // Empêche la boucle: si on est déjà sur /login on ne re-route pas
+        if (!pathname.startsWith('/auth') && pathname !== '/login') {
+          router.replace('/login');
         }
-      } else {
-        router.replace('/login');
+        return;
       }
 
-      setLoading(false);
+      setUser(firebaseUser);
+      setLoading(true);
+
+      // 📌 Abonnement live au document users/{uid}
+      const userRef = doc(db, 'users', firebaseUser.uid);
+      const unsubDoc = onSnapshot(
+        userRef,
+        (snap) => {
+          if (!mounted.current) return;
+
+          if (!snap.exists()) {
+            setHasProfile(false);
+            setRole('user'); // défaut
+            setLoading(false);
+
+            // Si pas de profil, renvoie l’utilisateur vers un écran d’onboarding
+            if (pathname !== '/auth/onboarding') {
+              router.replace('/auth/onboarding');
+            }
+            return;
+          }
+
+          setHasProfile(true);
+          const r = snap.data()?.role || 'user';
+          setRole(r);
+          setLoading(false);
+
+          // 🔐 Garde d’accès
+          if (requireSuperadmin && r !== 'superadmin') {
+            router.replace('/403'); // page d’accès refusé
+          } else if (requireAdmin && !['admin', 'superadmin'].includes(r)) {
+            router.replace('/403');
+          }
+        },
+        (err) => {
+          console.error('[AuthGuard] onSnapshot error', err);
+          setRole('user');
+          setLoading(false);
+        }
+      );
+
+      // Nettoyage du listener doc quand l’auth change
+      return () => unsubDoc();
     });
 
-    return () => unsubscribe();
-  }, []);
+    return () => {
+      mounted.current = false;
+      unsubAuth();
+    };
+  }, [pathname, requireAdmin, requireSuperadmin]);
 
-  return { user, role, loading };
+  return { user, role, loading, hasProfile };
 };
 
-/**
- * ✅ Vérifie si l'utilisateur est connecté (promesse utilisable dans des fonctions async)
- */
-export const checkAuth = () => {
-  return new Promise((resolve) => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      unsubscribe();
-      resolve(user);
-    });
-  });
-};
-
-/**
- * ✅ Vérifie si l'utilisateur a accès admin (admin OU superadmin)
- */
-export const checkAdminAccess = async (uid) => {
-  try {
-    const userRef = doc(db, 'users', uid);
-    const snap = await getDoc(userRef);
-    const role = snap.exists() ? snap.data().role : null;
-    return ['admin', 'superadmin'].includes(role);
-  } catch (e) {
-    console.error('Erreur vérification accès admin :', e);
-    return false;
-  }
-};
-
-/**
- * ✅ Vérifie si l'utilisateur est superadmin UNIQUEMENT
- */
-export const checkSuperAdminAccess = async (uid) => {
-  try {
-    const userRef = doc(db, 'users', uid);
-    const snap = await getDoc(userRef);
-    return snap.exists() && snap.data().role === 'superadmin';
-  } catch (e) {
-    console.error('Erreur vérification superadmin :', e);
-    return false;
-  }
-};
-
-/**
- * ✅ Renvoie true si le rôle est admin ou superadmin (pour logique de composants)
- */
-export const isAdmin = (role) => {
-  return ['admin', 'superadmin'].includes(role);
-};
-
-/**
- * ✅ Renvoie true si le rôle est superadmin (pour logique de composants)
- */
-export const isSuperAdmin = (role) => {
-  return role === 'superadmin';
-};
+// Helpers
+export const isAdmin = (role) => ['admin', 'superadmin'].includes(role);
+export const isSuperAdmin = (role) => role === 'superadmin';
