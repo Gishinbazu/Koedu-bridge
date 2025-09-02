@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 rules_version = '2';
 
 service cloud.firestore {
@@ -47,6 +48,18 @@ service cloud.firestore {
     // Par défaut : rien d'autre n'est accessible
     match /{document=**} {
       allow read, write: if false;
+=======
+// Firestore rules (exemple)
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+
+    match /users/{uid} {
+      allow read, update: if isOwner(uid);
+      allow create: if isOwner(uid);
+>>>>>>> af5c690 (Initial commit)
     }
   }
 }
