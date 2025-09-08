@@ -1,0 +1,12 @@
+{
+  "id": "bsc-cs-sunmoon-2026s",
+  "title": "BSc in Computer Science",
+  "description": "AI, data science, and systems at Sunmoon University.",
+  "university": "Sunmoon University",
+  "level": "Bachelor",
+  "semester": "2026-Spring",
+  "keywords": ["computer", "ai", "data"],
+  "language": "English",
+  "duration": "4 years",
+  "fees": 12000000
+}

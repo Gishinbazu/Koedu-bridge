@@ -1,0 +1,49 @@
+export type Level = 'Bachelor' | 'Master' | 'PhD' | 'Language';
+export type Delivery = 'Online' | 'On-campus' | 'Hybrid';
+export type Status = 'draft' | 'published' | 'archived';
+
+export interface FeeItem { label: string; amount: number }
+
+export interface Program {
+  id?: string;
+  title: string;
+  subtitle?: string;
+  description: string;
+  university: string;
+  campus?: string;
+  level: Level;
+  semester: string;              // YYYY-Season
+  delivery?: Delivery;
+  language?: string;
+  duration?: string;
+  ectsOrCredits?: number;
+
+  fees?: number | null;
+  feesBreakdown?: FeeItem[];
+  currency?: string;
+
+  admissions?: {
+    applicationWindow?: { start?: string; end?: string };
+    deadlines?: { label: string; date: string }[];
+    requirements?: {
+      education?: string;
+      gpaMin?: number;
+      tests?: string[];
+      documents?: string[];
+      portfolio?: boolean;
+    };
+    selection?: string;
+    applicationLink?: string;
+  };
+
+  contacts?: { email?: string; phone?: string; website?: string };
+  media?: { coverImage?: string; gallery?: string[] };
+
+  tags?: string[];
+  keywords?: string[];
+  searchIndex?: string[];
+
+  status?: Status;
+  createdAt?: string;
+  updatedAt?: string;
+}

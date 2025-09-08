@@ -8,20 +8,38 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import Footer from '../components/Footer';
 
+import Footer from '../components/Footer';
+import { ThemeProvider, useAppTheme } from '../theme/AppTheme';
+
+// Outer: provides theme to the whole app
 export default function RootLayout() {
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+    <ThemeProvider>
+      <RootLayoutInner />
+    </ThemeProvider>
+  );
+}
 
-      {/* ✅ Scroll global, mobile et desktop */}
+// Inner: consumes theme (so StatusBar + backgrounds follow palette)
+function RootLayoutInner() {
+  const { theme, isDarkMode } = useAppTheme();
+
+  return (
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.top }]}>
+      <StatusBar
+        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        translucent
+        backgroundColor="transparent"
+      />
+
+      {/* ✅ Global scroll (mobile + desktop) */}
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Zone principale des écrans */}
-        <View style={styles.screenArea}>
+        {/* Main screen area */}
+        <View style={[styles.screenArea, { backgroundColor: 'transparent' }]}>
           <Stack
             screenOptions={{
               headerShown: false,
@@ -31,7 +49,7 @@ export default function RootLayout() {
           />
         </View>
 
-        {/* ✅ Footer intégré au scroll */}
+        {/* ✅ Footer integrated in scroll */}
         <Footer />
       </ScrollView>
     </SafeAreaView>
@@ -41,17 +59,15 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#000',
   },
   scrollContent: {
     flexGrow: 1,
     backgroundColor: 'transparent',
-    paddingBottom: 20, // espace pour éviter que le footer colle au bord sur mobile
+    paddingBottom: 20, // spacing so footer doesn't stick to edge on mobile
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0,
   },
   screenArea: {
     flex: 1,
-    minHeight: '100%', // pousse le footer en bas si contenu court
-    backgroundColor: 'transparent',
+    minHeight: '100%', // push footer to bottom if content is short
   },
 });

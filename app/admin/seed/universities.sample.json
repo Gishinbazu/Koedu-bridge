@@ -1,0 +1,12 @@
+[
+  {"id":"sunmoon","name":"Sunmoon University","city":"Asan","region":"Chungcheongnam-do","type":"Private","shortDesc":"Private university in Asan with strong international programs.","logoUrl":"https://…/sunmoon.png","website":"https://www.sunmoon.ac.kr/","keywords":["sunmoon","asan","smu"],"rank":1},
+  {"id":"snu","name":"Seoul National University","city":"Seoul","region":"Seoul","type":"Public","shortDesc":"Flagship national university of Korea.","logoUrl":"https://…/snu.png","website":"https://en.snu.ac.kr/","keywords":["snu","seoul national"],"rank":2},
+  {"id":"kaist","name":"KAIST","city":"Daejeon","region":"Daejeon","type":"Public","shortDesc":"Top science & tech university.","logoUrl":"https://…/kaist.png","website":"https://www.kaist.ac.kr/","keywords":["kaist"],"rank":3},
+  {"id":"yonsei","name":"Yonsei University","city":"Seoul","region":"Seoul","type":"Private","shortDesc":"Member of SKY.","logoUrl":"https://…/yonsei.png","website":"https://www.yonsei.ac.kr/","keywords":["yonsei"],"rank":4},
+  {"id":"korea","name":"Korea University","city":"Seoul","region":"Seoul","type":"Private","shortDesc":"Member of SKY.","logoUrl":"https://…/korea.png","website":"https://www.korea.ac.kr/","keywords":["korea univ"],"rank":5},
+  {"id":"postech","name":"POSTECH","city":"Pohang","region":"Gyeongsangbuk-do","type":"Private","shortDesc":"Research-focused science & tech.","logoUrl":"https://…/postech.png","website":"https://www.postech.ac.kr/","keywords":["postech"],"rank":6},
+  {"id":"hanyang","name":"Hanyang University","city":"Seoul","region":"Seoul","type":"Private","shortDesc":"Strong engineering & entrepreneurship.","logoUrl":"https://…/hanyang.png","website":"https://www.hanyang.ac.kr/","keywords":["hanyang"],"rank":7},
+  {"id":"ewha","name":"Ewha Womans University","city":"Seoul","region":"Seoul","type":"Private","shortDesc":"Leading women's university.","logoUrl":"https://…/ewha.png","website":"https://www.ewha.ac.kr/","keywords":["ewha"],"rank":8},
+  {"id":"skku","name":"Sungkyunkwan University","city":"Seoul/Suwon","region":"Gyeonggi-do","type":"Private","shortDesc":"Historic, supported by Samsung.","logoUrl":"https://…/skku.png","website":"https://www.skku.edu/","keywords":["skku"],"rank":9},
+  {"id":"ajou","name":"Ajou University","city":"Suwon","region":"Gyeonggi-do","type":"Private","shortDesc":"Innovative private university in Suwon.","logoUrl":"https://…/ajou.png","website":"https://www.ajou.ac.kr/","keywords":["ajou"],"rank":10}
+]

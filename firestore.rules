@@ -1,65 +1,198 @@
-<<<<<<< HEAD
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function signedIn() {
-      return request.auth != null;
+    /* ───────────── Helpers ───────────── */
+    function signedIn() { return request.auth != null; }
+    function roleOf(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data.role;
     }
-
-    function isSelf(uid) {
-      return signedIn() && request.auth.uid == uid;
-    }
-
-    // Lit le rôle du user connecté depuis son propre doc
-    function myRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
-    }
-
     function isAdmin() {
-      return signedIn() && (myRole() == 'admin' || myRole() == 'superadmin');
+      return signedIn()
+        && (roleOf(request.auth.uid) == 'admin' || roleOf(request.auth.uid) == 'superadmin');
     }
-
     function isManager() {
-      return signedIn() && (myRole() == 'manager' || isAdmin());
+      return signedIn()
+        && (roleOf(request.auth.uid) == 'manager' || isAdmin());
     }
+    function isSelf(uid) { return signedIn() && request.auth.uid == uid; }
 
-    // ---- users collection ----
+    /* ───────────── users ───────────── */
     match /users/{uid} {
-      // Un utilisateur peut créer son propre doc (ex: onboarding)
       allow create: if isSelf(uid);
-
-      // Lecture : soi-même, ou admin/superadmin
       allow get, list: if isSelf(uid) || isAdmin();
-
-      // Mise à jour : soi-même, manager (si tu veux), ou admin/superadmin
       allow update: if isSelf(uid) || isManager() || isAdmin();
-
-      // Suppression : admin/superadmin uniquement
       allow delete: if isAdmin();
     }
 
-    // ---- exemples pour d'autres collections (optionnel) ----
-    // match /applications/{docId} {
-    //   allow read, write: if signedIn(); // à affiner selon ton modèle
-    // }
+    /* ───────────── programs (public + back-office) ─────────────
+       - Public: GET autorisé si "published"
+       - LIST: ouvert (page publique) ; filtrer côté client par status == 'published'
+       - Staff: CRUD complet (delete réservé admin ; change si besoin)
+    */
+    match /programs/{id} {
+      // Lecture d’un doc (GET)
+      allow get: if
+        (resource.data.status == 'published' || resource.data.published == true) // public
+        || isManager() || isAdmin();                                             // staff
 
-    // Par défaut : rien d'autre n'est accessible
-    match /{document=**} {
-      allow read, write: if false;
-=======
-// Firestore rules (exemple)
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    function isSignedIn() { return request.auth != null; }
-    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+      // List / requêtes de collection / agrégations
+      // ⚠️ on ne peut pas lire resource.* en list. On laisse ouvert (usage public),
+      // mais exige un filtre côté client: where('status', '==', 'published').
+      // Si tu veux verrouiller, passe par CF ou duplique en /publicPrograms.
+      allow list: if true;
 
-    match /users/{uid} {
-      allow read, update: if isOwner(uid);
-      allow create: if isOwner(uid);
->>>>>>> af5c690 (Initial commit)
+      // Écriture back-office
+      allow create: if isManager() || isAdmin();
+      allow update: if isManager() || isAdmin();
+      allow delete: if isAdmin();
     }
+
+    // Sous-collections éventuelles de programs
+    match /programs/{id}/{subpath=**} {
+      allow read: if isManager() || isAdmin();
+      allow write: if isManager() || isAdmin();
+    }
+
+    /* ───────────── universities (lecture publique, CRUD admin) ───────────── */
+    match /universities/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /universities/{id}/{sub=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    /* ───────────── infoPages (CMS) ─────────────
+       Managers et admins peuvent créer/éditer/supprimer
+       Public peut lire
+    */
+    match /infoPages/{docId} {
+      allow get, list: if true;
+      allow create, update, delete: if isManager() || isAdmin();
+    }
+
+    /* ───────────── applications (candidatures) ─────────────
+       - get: créateur ou staff
+       - list: staff (nécessaire pour agrégations dashboard)
+       - create: l’utilisateur pour lui-même
+       - update: créateur si brouillon/new, ou staff
+    */
+    match /applications/{appId} {
+      allow get: if signedIn() && (
+        isManager() || isAdmin() || resource.data.createdBy == request.auth.uid
+      );
+
+      // list ne peut pas regarder resource.data => réserver au staff
+      allow list: if isManager() || isAdmin();
+
+      allow create: if signedIn() &&
+        request.resource.data.createdBy == request.auth.uid;
+
+      allow update: if signedIn() && (
+        isManager() || isAdmin() ||
+        (
+          resource.data.createdBy == request.auth.uid &&
+          resource.data.status in ['draft', 'new']
+        )
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    /* ───────────── events (calendrier) ─────────────
+       - get: staff OU un attendee
+       - list: staff (évite d’utiliser resource.data en list)
+       - write: staff
+    */
+    match /events/{eventId} {
+      allow get: if signedIn() && (
+        isManager() || isAdmin() ||
+        (resource.data.attendees != null && request.auth.uid in resource.data.attendees)
+      );
+
+      // list: staff uniquement (sinon 403 si on essaye d'utiliser resource.*)
+      allow list: if isManager() || isAdmin();
+
+      allow create, update: if isManager() || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    /* ───────────── tasks (tâches manager) ─────────────
+       - get: staff OU assignee OU créateur
+       - list: staff OU (requête avec where assigneeId == me)
+       - write: staff ; update possible par assignee/creator
+    */
+    match /tasks/{taskId} {
+      allow get: if signedIn() && (
+        isManager() || isAdmin() ||
+        resource.data.assigneeId == request.auth.uid ||
+        resource.data.createdBy  == request.auth.uid
+      );
+
+      // list: staff OU requête typée "mes tâches" (assigneeId == me)
+      allow list: if
+        isManager() || isAdmin() ||
+        (
+          signedIn() &&
+          request.query != null &&
+          request.query.where.size() > 0 &&
+          request.query.where[0].field.fieldPath == 'assigneeId' &&
+          request.query.where[0].op == '==' &&
+          request.query.where[0].value == request.auth.uid
+        );
+
+      allow create: if isManager() || isAdmin();
+
+      allow update: if signedIn() && (
+        isManager() || isAdmin() ||
+        resource.data.assigneeId == request.auth.uid ||
+        resource.data.createdBy  == request.auth.uid
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    /* ───────────── inbox threads/messages ───────────── */
+    match /threads/{tid} {
+      allow get: if signedIn() && (
+        isManager() || isAdmin() ||
+        request.auth.uid in resource.data.members ||
+        resource.data.assigneeId == request.auth.uid
+      );
+
+      // list: staff uniquement (sinon on ne peut pas référencer resource.*)
+      allow list: if isManager() || isAdmin();
+
+      allow create: if signedIn() &&
+        request.resource.data.members != null &&
+        request.auth.uid in request.resource.data.members;
+
+      allow update: if signedIn() && (
+        isManager() || isAdmin() ||
+        resource.data.createdBy == request.auth.uid ||
+        resource.data.assigneeId == request.auth.uid ||
+        request.auth.uid in resource.data.members
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    match /threads/{tid}/messages/{mid} {
+      allow get, list, create: if signedIn() && (
+        isManager() || isAdmin() ||
+        request.auth.uid in get(/databases/$(database)/documents/threads/$(tid)).data.members ||
+        get(/databases/$(database)/documents/threads/$(tid)).data.assigneeId == request.auth.uid
+      );
+
+      allow update, delete: if signedIn() && (
+        isManager() || isAdmin() || request.auth.uid == resource.data.authorId
+      );
+    }
+
+    /* ───────────── deny everything else ───────────── */
+    match /{document=**} { allow read, write: if false; }
   }
 }
