@@ -1,50 +1,109 @@
-# Welcome to your Expo app 👋
+# 🌉 KOEDU Bridge
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+KOEDU Bridge is a comprehensive digital platform designed to support  
+**international students applying to universities in South Korea**.
 
-## Get started
+The platform centralizes the **admission process**, **document management**, and  
+**communication between students, agents, and universities**.
 
-1. Install dependencies
+KOEDU Bridge는 **외국인 학생들의 한국 대학 입학 과정**을 체계적으로 지원하기 위해 개발된 통합 플랫폼입니다.  
+입학 절차, 서류 관리, 학생–에이전트–대학 간 소통을 하나의 시스템에서 제공합니다.
 
-   ```bash
-   npm install
-   ```
+---
 
-2. Start the app
+## 🧱 Technology Stack | 기술 스택
 
-   ```bash
-   npx expo start
-   ```
+### Backend
+- Node.js
+- TypeScript
+- Express.js
+- **MongoDB (Atlas) — Main Database**
+- Mongoose (ODM)
+- JWT Authentication
 
-In the output, you'll find options to open the app in a
+### Frontend
+- Expo (React Native)
+- Expo Router (File-based routing)
+- Android / iOS / Web
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+---
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## 🗄️ Database | 데이터베이스
 
-## Get a fresh project
+This project uses **MongoDB as the primary backend database**.
 
-When you're ready, run:
+- MongoDB Atlas (Cloud)
+- Collections for:
+  - Users
+  - Applications
+  - Universities
+  - Programs
+  - Documents
+  - News / Statistics
+- Data modeling with **Mongoose**
+
+본 프로젝트는 **MongoDB를 백엔드 메인 데이터베이스로 사용**합니다.
+
+- MongoDB Atlas (클라우드)
+- 주요 컬렉션:
+  - 사용자 (Users)
+  - 지원서 (Applications)
+  - 대학 (Universities)
+  - 전공 / 프로그램 (Programs)
+  - 제출 서류 (Documents)
+  - 공지 / 통계 (News / Statistics)
+- **Mongoose ODM** 기반 데이터 모델링
+
+---
+
+## 📁 Project Structure | 프로젝트 구조
+
+
+
+Koedu-bridge/
+│
+├── backend/ # Backend API (Node.js + TypeScript)
+│ ├── src/
+│ │ ├── server.ts
+│ │ ├── routes/
+│ │ ├── controllers/
+│ │ ├── models/ # MongoDB Schemas (Mongoose)
+│ │ └── config/
+│ └── package.json
+│
+├── app/ # Expo Frontend (Expo Router)
+│ ├── index.js
+│ ├── auth/
+│ ├── info/
+│ ├── dashboard/
+│ │ ├── student/
+│ │ └── admin/
+│ └── _layout.js
+│
+├── components/
+├── services/ # API clients (non-routed)
+├── assets/
+├── app.json
+├── package.json
+└── README.md
+
+
+---
+
+## ⚙️ Prerequisites | 사전 준비 사항
+
+- Node.js (LTS recommended)
+- npm
+- MongoDB Atlas account (or local MongoDB)
+- Expo CLI
+- Expo Go (for mobile testing)
+
+---
+
+## 🚀 Run Backend | 백엔드 실행
 
 ```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+cd ~/Documents/Koedu-bridge
+cd backend
+npm install
+npm run dev

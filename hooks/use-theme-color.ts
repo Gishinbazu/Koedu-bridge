@@ -1,21 +1,34 @@
+// hooks/use-theme-color.ts
+import { useColorScheme } from "react-native";
+import { Colors } from "../constants/theme";
+
+type Theme = "light" | "dark";
+
+type Props = {
+  light?: string;
+  dark?: string;
+};
+
 /**
- * Learn more about light and dark modes:
- * https://docs.expo.dev/guides/color-schemes/
+ * Petit helper pour choisir une couleur selon le thème.
+ * - si props.light / props.dark sont fournis, on les utilise
+ * - sinon on renvoie une couleur par défaut depuis Colors
  */
-
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
 export function useThemeColor(
-  props: { light?: string; dark?: string },
-  colorName: keyof typeof Colors.light & keyof typeof Colors.dark
+  props: Props,
+  colorName: keyof typeof Colors = "background"
 ) {
-  const theme = useColorScheme() ?? 'light';
-  const colorFromProps = props[theme];
+  const scheme = (useColorScheme() ?? "light") as Theme;
 
-  if (colorFromProps) {
-    return colorFromProps;
-  } else {
-    return Colors[theme][colorName];
+  if (scheme === "dark") {
+    // couleur donnée en paramètre ou fallback sombre
+    return props.dark ?? (colorName === "background"
+      ? Colors.background
+      : Colors.primaryDark);
   }
+
+  // thème clair
+  return props.light ?? (colorName === "background"
+    ? Colors.cardBackground
+    : Colors.primary);
 }
