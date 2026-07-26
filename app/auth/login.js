@@ -69,7 +69,7 @@ export default function LoginScreen() {
     if (!emailClean || !password) {
       return Alert.alert(
         "Missing fields",
-        "Please enter both email and password."
+        "Please enter both email and password.",
       );
     }
 
@@ -99,7 +99,7 @@ export default function LoginScreen() {
 
       // 🔀 DEFAULT REDIRECTION BY ROLE
       if (user?.role === "admin" || user?.role === "superadmin") {
-        router.replace("/admin");
+        router.replace("/admin/dashboard");
       } else if (user?.role === "manager") {
         router.replace("/manager");
       } else {
@@ -108,7 +108,7 @@ export default function LoginScreen() {
     } catch (e) {
       Alert.alert(
         "Sign-in failed",
-        e?.message || "Something went wrong. Please try again."
+        e?.message || "Something went wrong. Please try again.",
       );
     } finally {
       setLoading(false);
@@ -150,9 +150,7 @@ export default function LoginScreen() {
               <View style={styles.leftPanel}>
                 <Text style={styles.logo}>KOEDU Bridge</Text>
                 <Text style={styles.welcome}>Welcome back</Text>
-                <Text style={styles.subWelcome}>
-                  Sign in to your account
-                </Text>
+                <Text style={styles.subWelcome}>Sign in to your account</Text>
                 <Text style={styles.description}>
                   Access your dashboard, applications, and documents all in one
                   place.
@@ -184,9 +182,7 @@ export default function LoginScreen() {
                     onChangeText={setPassword}
                   />
                   <TouchableOpacity onPress={() => setSecure(!secure)}>
-                    <Text style={styles.eye}>
-                      {secure ? "👁️" : "🙈"}
-                    </Text>
+                    <Text style={styles.eye}>{secure ? "👁️" : "🙈"}</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -222,9 +218,7 @@ export default function LoginScreen() {
                 </TouchableOpacity>
 
                 {/* SIGN UP */}
-                <TouchableOpacity
-                  onPress={() => router.push("/auth/signup")}
-                >
+                <TouchableOpacity onPress={() => router.push("/auth/signup")}>
                   <Text style={styles.link}>
                     Don’t have an account? Sign up
                   </Text>

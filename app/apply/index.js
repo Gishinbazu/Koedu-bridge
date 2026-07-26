@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -14,7 +15,7 @@ import {
   View,
 } from "react-native";
 
-// ✅ ULTRA-SAFE IMPORT (évite "is not a function")
+// ✅ ULTRA-SAFE IMPORT
 import * as applicationsApi from "../../services/applicationsApi";
 
 import styles, { COLORS } from "../../styles/apply/applystyle";
@@ -33,7 +34,7 @@ export default function ApplyHubScreen() {
       bachelor: "/apply/bachelor/[id]",
       master: "/apply/master/[id]",
     }),
-    []
+    [],
   );
 
   const payloadByTrack = useMemo(
@@ -60,33 +61,55 @@ export default function ApplyHubScreen() {
         universityName: "Sunmoon University",
       },
     }),
-    []
+    [],
   );
+
+  const showAlertWithAction = (title, message, onConfirm) => {
+    if (Platform.OS === "web") {
+      if (confirm(`${title}\n\n${message}`)) {
+        if (onConfirm) onConfirm();
+      }
+    } else {
+      Alert.alert(title, message, [
+        { text: "Cancel", style: "cancel" },
+        { text: "Log In", onPress: onConfirm },
+      ]);
+    }
+  };
 
   const startTrack = async (track) => {
     if (loadingTrack) return; // évite double-click
     setLoadingTrack(track);
 
     try {
-      // ✅ DEBUG: si ça affiche undefined → import/path incorrect
-      // console.log("applicationsApi =", applicationsApi);
-
       if (typeof applicationsApi.createApplication !== "function") {
         console.log("❌ createApplication is missing:", applicationsApi);
-        Alert.alert(
-          "Import error",
-          "createApplication is undefined. Check services/applicationsApi.js path + restart Expo with -c."
-        );
+        if (Platform.OS === "web") {
+          alert(
+            "Import error: createApplication is undefined. Check services/applicationsApi.js path.",
+          );
+        } else {
+          Alert.alert(
+            "Import error",
+            "createApplication is undefined. Check services/applicationsApi.js path.",
+          );
+        }
         return;
       }
 
-      const res = await applicationsApi.createApplication(payloadByTrack[track]);
+      const res = await applicationsApi.createApplication(
+        payloadByTrack[track],
+      );
       const app = res?.application || res; // si API renvoie directement l'app
       const id = getAppId(app);
 
       if (!id) {
         console.log("❌ No application id returned:", res);
-        Alert.alert("Server error", "No application id returned by backend.");
+        if (Platform.OS === "web") {
+          alert("Server error: No application id returned by backend.");
+        } else {
+          Alert.alert("Server error", "No application id returned by backend.");
+        }
         return;
       }
 
@@ -96,8 +119,29 @@ export default function ApplyHubScreen() {
         params: { id: String(id) },
       });
     } catch (err) {
-      console.log(`Error creating ${track} application:`, err?.message || err);
-      Alert.alert("Error", err?.message || "Server error.");
+      const errorMsg = err?.message || err;
+      console.log(`Error creating ${track} application:`, errorMsg);
+
+      // Handle missing or expired token / unauthorized access
+      if (
+        typeof errorMsg === "string" &&
+        (errorMsg.includes("No token") ||
+          errorMsg.includes("401") ||
+          errorMsg.includes("Unauthorized") ||
+          errorMsg.includes("jwt"))
+      ) {
+        showAlertWithAction(
+          "Authentication Required",
+          "You must be logged in to start an application.",
+          () => router.push("/auth/login"),
+        );
+      } else {
+        if (Platform.OS === "web") {
+          alert(`Error: ${errorMsg || "Server error."}`);
+        } else {
+          Alert.alert("Error", errorMsg || "Server error.");
+        }
+      }
     } finally {
       setLoadingTrack(null);
     }
@@ -142,7 +186,11 @@ export default function ApplyHubScreen() {
               <ActivityIndicator color={COLORS.primary} />
             ) : (
               <View style={local.arrowBtn}>
-                <Ionicons name="arrow-forward" size={18} color={COLORS.primary} />
+                <Ionicons
+                  name="arrow-forward"
+                  size={18}
+                  color={COLORS.primary}
+                />
               </View>
             )}
           </View>
@@ -152,7 +200,10 @@ export default function ApplyHubScreen() {
   };
 
   return (
-    <LinearGradient colors={[COLORS.bgStart, COLORS.bgEnd]} style={styles.screen}>
+    <LinearGradient
+      colors={[COLORS.bgStart, COLORS.bgEnd]}
+      style={styles.screen}
+    >
       <SafeAreaView style={{ flex: 1 }}>
         <ScrollView
           style={styles.scroll}

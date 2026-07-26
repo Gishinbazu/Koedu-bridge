@@ -1,4 +1,4 @@
-// app/services/userApi.js
+// services/userApi.js
 import { apiFetch } from "./apiClient";
 
 /* ============================================================
@@ -12,7 +12,6 @@ export async function getProfile() {
 
 /** Mise à jour du profil user */
 export async function updateProfile(data) {
-  // ✅ on envoie un objet, apiFetch stringify (si bien fait)
   return apiFetch("/api/users/me", {
     method: "PUT",
     body: data,
@@ -36,13 +35,29 @@ export async function changePassword({ currentPassword, newPassword }) {
  * ↳ backend : GET /api/applications/my
  */
 export async function getStudentApplication() {
-  const res = await apiFetch("/api/applications/my", { method: "GET" });
+  try {
+    const res = await apiFetch("/api/applications/my", { method: "GET" });
 
-  const apps = res?.applications || [];
-  if (!apps.length) return null;
+    // Extrait la liste des candidatures peu importe le format de réponse
+    const apps =
+      res?.applications ||
+      res?.data?.applications ||
+      (Array.isArray(res) ? res : []);
 
-  // backend trié desc -> plus récente = 0
-  return apps[0];
+    if (apps && apps.length > 0) {
+      // Retourne sous forme d'objet { application: ... } pour être 100% compatible avec le dashboard
+      return { application: apps[0] };
+    }
+
+    if (res?.application) {
+      return { application: res.application };
+    }
+
+    return { application: null };
+  } catch (error) {
+    console.error("❌ Error fetching student application:", error);
+    return { application: null };
+  }
 }
 
 /** Récupérer liste des documents */

@@ -1,39 +1,115 @@
 // app/auth/signup.js
-import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    Easing,
-    ImageBackground,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    useWindowDimensions,
-    View,
-} from 'react-native';
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Easing,
+  ImageBackground,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from "react-native";
 
-import { registerUser } from '../../services/authApi';
-import { signupStyles as styles } from '../../styles/AuthStyle/signupStyles';
+import { registerUser } from "../../services/authApi";
+import { signupStyles as styles } from "../../styles/AuthStyle/signupStyles";
+
+// =========================================================================
+// 🚀 SOUS-COMPOSANTS DÉCLARÉS À L'EXTÉRIEUR POUR ÉVITER LA PERTE DU FOCUS
+// =========================================================================
+
+function Point({ icon, text }) {
+  return (
+    <View style={styles.pointRow}>
+      <Ionicons name={icon} size={16} color="#7CFFB2" />
+      <Text style={styles.pointText}>{text}</Text>
+    </View>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  keyboardType,
+  autoCapitalize,
+  autoCorrect,
+  secureTextEntry,
+  icon,
+  error,
+  rightAdornment,
+}) {
+  return (
+    <View style={{ marginBottom: 12 }}>
+      <Text style={styles.label}>{label}</Text>
+      <View
+        style={[
+          styles.inputWrap,
+          error && {
+            borderColor: "#ff9b9b",
+            backgroundColor: "rgba(255,155,155,0.06)",
+          },
+        ]}
+      >
+        <Ionicons
+          name={icon}
+          size={18}
+          color="#fff"
+          style={{ marginRight: 8 }}
+        />
+        <TextInput
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor="rgba(255,255,255,0.6)"
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+          autoCorrect={autoCorrect ?? false}
+          secureTextEntry={secureTextEntry}
+          style={[
+            styles.input,
+            {
+              flex: 1,
+              color: "#FFFFFF", // Texte blanc visible
+              fontSize: 14,
+              outlineStyle: "none", // Supprime la bordure bleue par défaut sur navigateur
+            },
+          ]}
+        />
+        {!!rightAdornment && (
+          <View style={{ marginLeft: 8 }}>{rightAdornment}</View>
+        )}
+      </View>
+      {!!error && <Text style={styles.errorText}>{error}</Text>}
+    </View>
+  );
+}
+
+// =========================================================================
+// ÉCRAN PRINCIPAL
+// =========================================================================
 
 export default function SignupScreen() {
   const router = useRouter();
 
   // form state
-  const [email, setEmail] = useState('');
-  const [name, setName] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [accept, setAccept] = useState(false);
 
   // ui state
@@ -71,12 +147,12 @@ export default function SignupScreen() {
 
   // helpers
   const emailValid = useMemo(
-    () => /^\S+@\S+\.\S+$/.test((email || '').trim()),
-    [email]
+    () => /^\S+@\S+\.\S+$/.test((email || "").trim()),
+    [email],
   );
 
   const pwdScore = useMemo(() => {
-    const p = password || '';
+    const p = password || "";
     let score = 0;
     if (p.length >= 6) score++;
     if (p.length >= 10) score++;
@@ -87,23 +163,23 @@ export default function SignupScreen() {
   }, [password]);
 
   const pwdLabel =
-    ['Very weak', 'Weak', 'Okay', 'Good', 'Strong', 'Great'][pwdScore] ||
-    'Very weak';
+    ["Very weak", "Weak", "Okay", "Good", "Strong", "Great"][pwdScore] ||
+    "Very weak";
   const pwdBarWidth = `${(pwdScore / 5) * 100}%`;
 
   const validate = () => {
-    const emailClean = (email || '').trim().toLowerCase();
-    const nameClean = (name || '').trim();
+    const emailClean = (email || "").trim().toLowerCase();
+    const nameClean = (name || "").trim();
     const next = {};
-    if (!nameClean) next.name = 'Please enter your full name.';
-    if (!emailClean) next.email = 'Email is required.';
-    else if (!emailValid) next.email = 'Please enter a valid email.';
-    if (!password) next.password = 'Password is required.';
-    else if (password.length < 6) next.password = 'Minimum 6 characters.';
-    if (!confirmPassword) next.confirm = 'Please confirm your password.';
+    if (!nameClean) next.name = "Please enter your full name.";
+    if (!emailClean) next.email = "Email is required.";
+    else if (!emailValid) next.email = "Please enter a valid email.";
+    if (!password) next.password = "Password is required.";
+    else if (password.length < 6) next.password = "Minimum 6 characters.";
+    if (!confirmPassword) next.confirm = "Please confirm your password.";
     else if (password !== confirmPassword)
-      next.confirm = 'Passwords do not match.';
-    if (!accept) next.accept = 'You must accept the Terms & Privacy.';
+      next.confirm = "Passwords do not match.";
+    if (!accept) next.accept = "You must accept the Terms & Privacy.";
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -111,8 +187,8 @@ export default function SignupScreen() {
   const handleSignup = async () => {
     if (!validate()) return;
 
-    const emailClean = (email || '').trim().toLowerCase();
-    const nameClean = (name || '').trim();
+    const emailClean = (email || "").trim().toLowerCase();
+    const nameClean = (name || "").trim();
 
     setLoading(true);
     try {
@@ -123,13 +199,18 @@ export default function SignupScreen() {
         password,
       });
 
-      console.log('✅ Signup success:', res);
+      console.log("✅ Signup success:", res);
       setModalVisible(true);
     } catch (e) {
-      console.error('[signup]', e);
-      let msg = 'Sign up failed.';
+      console.error("[signup]", e);
+      let msg = "Sign up failed.";
       if (e?.message) msg = e.message;
-      Alert.alert('Sign up', msg);
+
+      if (Platform.OS === "web") {
+        alert(`Sign up Error: ${msg}`);
+      } else {
+        Alert.alert("Sign up", msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -137,25 +218,25 @@ export default function SignupScreen() {
 
   return (
     <ImageBackground
-      source={require('../../assets/images/sunrise.jpg')}
+      source={require("../../assets/images/sunrise.jpg")}
       style={styles.bg}
       resizeMode="cover"
     >
       <LinearGradient
-        colors={['rgba(3,8,23,0.55)', 'rgba(3,8,23,0.75)']}
+        colors={["rgba(3,8,23,0.55)", "rgba(3,8,23,0.75)"]}
         style={styles.gradientOverlay}
       />
       <StatusBar barStyle="light-content" />
 
       <SafeAreaView style={{ flex: 1 }}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={{ flex: 1 }}
         >
           <ScrollView
             contentContainerStyle={[
               styles.outer,
-              { flexDirection: isMobile ? 'column' : 'row' },
+              { flexDirection: isMobile ? "column" : "row" },
             ]}
             keyboardShouldPersistTaps="handled"
           >
@@ -166,14 +247,15 @@ export default function SignupScreen() {
                 isMobile && {
                   paddingHorizontal: 20,
                   paddingTop: 24,
-                  alignItems: 'center',
+                  alignItems: "center",
                 },
               ]}
             >
               <Text style={styles.kicker}>KOEDU Bridge</Text>
               <Text style={styles.heroTitle}>Create your account</Text>
               <Text style={styles.heroSub}>
-                Find programs, track your application, and get guidance—end-to-end.
+                Find programs, track your application, and get
+                guidance—end-to-end.
               </Text>
               <View style={styles.points}>
                 <Point
@@ -191,7 +273,7 @@ export default function SignupScreen() {
               </View>
               <Pressable
                 style={styles.backHome}
-                onPress={() => router.push('/')}
+                onPress={() => router.push("/")}
               >
                 <Ionicons name="arrow-back" size={16} color="#fff" />
                 <Text style={styles.backHomeText}>Back to Home</Text>
@@ -241,9 +323,9 @@ export default function SignupScreen() {
                   rightAdornment={
                     email.length > 0 ? (
                       <Ionicons
-                        name={emailValid ? 'checkmark-circle' : 'close-circle'}
+                        name={emailValid ? "checkmark-circle" : "close-circle"}
                         size={18}
-                        color={emailValid ? '#7CFFB2' : '#ff9b9b'}
+                        color={emailValid ? "#7CFFB2" : "#ff9b9b"}
                       />
                     ) : null
                   }
@@ -265,9 +347,7 @@ export default function SignupScreen() {
                   rightAdornment={
                     <Pressable onPress={() => setShowPwd((v) => !v)}>
                       <Ionicons
-                        name={
-                          showPwd ? 'eye-off-outline' : 'eye-outline'
-                        }
+                        name={showPwd ? "eye-off-outline" : "eye-outline"}
                         size={18}
                         color="#fff"
                       />
@@ -278,9 +358,7 @@ export default function SignupScreen() {
                 {/* Strength meter */}
                 <View style={styles.meterWrap}>
                   <View style={styles.meterBg}>
-                    <View
-                      style={[styles.meterFill, { width: pwdBarWidth }]}
-                    />
+                    <View style={[styles.meterFill, { width: pwdBarWidth }]} />
                   </View>
                   <Text style={styles.meterLabel}>{pwdLabel}</Text>
                 </View>
@@ -301,9 +379,7 @@ export default function SignupScreen() {
                   rightAdornment={
                     <Pressable onPress={() => setShowConfirm((v) => !v)}>
                       <Ionicons
-                        name={
-                          showConfirm ? 'eye-off-outline' : 'eye-outline'
-                        }
+                        name={showConfirm ? "eye-off-outline" : "eye-outline"}
                         size={18}
                         color="#fff"
                       />
@@ -317,27 +393,27 @@ export default function SignupScreen() {
                   onPress={() => setAccept((v) => !v)}
                 >
                   <Ionicons
-                    name={accept ? 'checkbox' : 'square-outline'}
+                    name={accept ? "checkbox" : "square-outline"}
                     size={20}
-                    color={accept ? '#FFD166' : '#fff'}
+                    color={accept ? "#FFD166" : "#fff"}
                   />
                   <Text style={styles.termsText}>
-                    I agree to the{' '}
+                    I agree to the{" "}
                     <Text
                       style={styles.link}
                       onPress={(e) => {
                         e.stopPropagation?.();
-                        router.push('/legal/terms');
+                        router.push("/legal/terms");
                       }}
                     >
                       Terms
-                    </Text>{' '}
-                    and{' '}
+                    </Text>{" "}
+                    and{" "}
                     <Text
                       style={styles.link}
                       onPress={(e) => {
                         e.stopPropagation?.();
-                        router.push('/legal/privacy');
+                        router.push("/legal/privacy");
                       }}
                     >
                       Privacy
@@ -377,7 +453,7 @@ export default function SignupScreen() {
                   <Text style={styles.redirectText}>
                     Already have an account?
                   </Text>
-                  <Pressable onPress={() => router.push('/auth/login')}>
+                  <Pressable onPress={() => router.push("/auth/login")}>
                     <Text style={styles.redirectLink}> Log in</Text>
                   </Pressable>
                 </View>
@@ -391,19 +467,13 @@ export default function SignupScreen() {
       {modalVisible && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Ionicons
-              name="checkmark-circle"
-              size={44}
-              color="#16a34a"
-            />
+            <Ionicons name="checkmark-circle" size={44} color="#16a34a" />
             <Text style={styles.modalTitle}>Account created!</Text>
-            <Text style={styles.modalSub}>
-              Welcome to KOEDU Bridge.
-            </Text>
+            <Text style={styles.modalSub}>Welcome to KOEDU Bridge.</Text>
             <Pressable
               onPress={() => {
                 setModalVisible(false);
-                router.replace('/auth/login');
+                router.replace("/auth/login");
               }}
               style={styles.modalBtn}
             >
@@ -413,66 +483,5 @@ export default function SignupScreen() {
         </View>
       )}
     </ImageBackground>
-  );
-}
-
-/* ---------- Small building blocks ---------- */
-function Point({ icon, text }) {
-  return (
-    <View style={styles.pointRow}>
-      <Ionicons name={icon} size={16} color="#7CFFB2" />
-      <Text style={styles.pointText}>{text}</Text>
-    </View>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChangeText,
-  placeholder,
-  keyboardType,
-  autoCapitalize,
-  autoCorrect,
-  secureTextEntry,
-  icon,
-  error,
-  rightAdornment,
-}) {
-  return (
-    <View style={{ marginBottom: 12 }}>
-      <Text style={styles.label}>{label}</Text>
-      <View
-        style={[
-          styles.inputWrap,
-          error && {
-            borderColor: '#ff9b9b',
-            backgroundColor: 'rgba(255,155,155,0.06)',
-          },
-        ]}
-      >
-        <Ionicons
-          name={icon}
-          size={18}
-          color="#fff"
-          style={{ marginRight: 8 }}
-        />
-        <TextInput
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor="rgba(255,255,255,0.6)"
-          keyboardType={keyboardType}
-          autoCapitalize={autoCapitalize}
-          autoCorrect={autoCorrect ?? false}
-          secureTextEntry={secureTextEntry}
-          style={styles.input}
-        />
-        {!!rightAdornment && (
-          <View style={{ marginLeft: 8 }}>{rightAdornment}</View>
-        )}
-      </View>
-      {!!error && <Text style={styles.errorText}>{error}</Text>}
-    </View>
   );
 }

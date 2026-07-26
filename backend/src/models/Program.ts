@@ -1,41 +1,78 @@
-// src/models/Program.ts
-import { Document, Schema, Types, model } from "mongoose";
-
-export type ProgramLevel = "Bachelor" | "Master" | "Language" | "Other";
+import { Document, Schema, model, models } from "mongoose";
 
 export interface IProgram extends Document {
   name: string;
-  level: ProgramLevel;
-  university: Types.ObjectId;
-  faculty?: string;
-  city?: string;
-  language?: string;
-  tuitionPerSemester?: number;
-  applicationFee?: number;
+  title?: string;
+  university: string;
+  type: "language" | "bachelor" | "master";
   description?: string;
-  tags?: string[];
+  duration?: string;
+  tuitionFee?: number;
+  pdfUrl?: string;
   isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-const programSchema = new Schema<IProgram>(
+const ProgramSchema = new Schema<IProgram>(
   {
-    name: { type: String, required: true },
-    level: {
+    name: {
       type: String,
-      enum: ["Bachelor", "Master", "Language", "Other"],
-      default: "Other"
+      required: [true, "Program name is required"],
+      trim: true,
     },
-    university: { type: Schema.Types.ObjectId, ref: "University", required: true },
-    faculty: String,
-    city: String,
-    language: String,
-    tuitionPerSemester: Number,
-    applicationFee: Number,
-    description: String,
-    tags: [String],
-    isActive: { type: Boolean, default: true }
+    title: {
+      type: String,
+      trim: true,
+    },
+    university: {
+      type: String,
+      required: [true, "University name is required"],
+      trim: true,
+    },
+    type: {
+      type: String,
+      enum: ["language", "bachelor", "master"],
+      default: "bachelor",
+      required: true,
+    },
+    description: {
+      type: String,
+      default: "",
+    },
+    duration: {
+      type: String,
+      default: "",
+    },
+    tuitionFee: {
+      type: Number,
+      default: 0,
+    },
+    pdfUrl: {
+      type: String,
+      default: "",
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  },
 );
 
-export const Program = model<IProgram>("Program", programSchema);
+ProgramSchema.pre<IProgram>("validate", function (next) {
+  if (!this.name && this.title) {
+    this.name = this.title;
+  }
+  if (!this.title && this.name) {
+    this.title = this.name;
+  }
+  next();
+});
+
+export const Program =
+  models.Program || model<IProgram>("Program", ProgramSchema, "programs");
+
+export default Program;

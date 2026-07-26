@@ -15,7 +15,6 @@ export interface IApplication extends Document {
   programTypeLabel?: string;
   universityName?: string;
 
-  // ✅ Interface corrigée : types simples
   passportName?: string | null;
   transcriptName?: string | null;
   bankStatementName?: string | null;
@@ -30,7 +29,13 @@ export interface IApplication extends Document {
 
   sponsor?: "self" | "parents";
   intake?: string;
-  status?: "draft" | "pending" | "submitted" | "in_review" | "accepted" | "rejected";
+  status?:
+    | "draft"
+    | "pending"
+    | "submitted"
+    | "in_review"
+    | "accepted"
+    | "rejected";
   progress?: number;
   timeline?: {
     submitted?: boolean;
@@ -39,6 +44,7 @@ export interface IApplication extends Document {
     finalDecision?: boolean;
   };
   createdBy: Types.ObjectId;
+  userId?: Types.ObjectId; // ✅ Champ ajouté à l'interface
   createdAt: Date;
   updatedAt: Date;
 }
@@ -48,14 +54,18 @@ const applicationSchema = new Schema<IApplication>(
     koeduId: { type: String },
     fullName: {
       type: String,
-      required: function (this: IApplication) { return this.status !== "draft"; },
+      required: function (this: IApplication) {
+        return this.status !== "draft";
+      },
     },
     nationality: { type: String },
     dob: { type: String },
     phone: { type: String },
     email: {
       type: String,
-      required: function (this: IApplication) { return this.status !== "draft"; },
+      required: function (this: IApplication) {
+        return this.status !== "draft";
+      },
     },
     lastSchool: { type: String },
     major: { type: String },
@@ -65,7 +75,6 @@ const applicationSchema = new Schema<IApplication>(
     programTypeLabel: { type: String },
     universityName: { type: String },
 
-    // ✅ Schema avec valeurs par défaut null
     passportName: { type: String, default: null },
     transcriptName: { type: String, default: null },
     bankStatementName: { type: String, default: null },
@@ -80,7 +89,18 @@ const applicationSchema = new Schema<IApplication>(
 
     sponsor: { type: String, enum: ["self", "parents"], default: "self" },
     intake: { type: String, default: "Spring 2026" },
-    status: { type: String, enum: ["draft", "pending", "submitted", "in_review", "accepted", "rejected"], default: "draft" },
+    status: {
+      type: String,
+      enum: [
+        "draft",
+        "pending",
+        "submitted",
+        "in_review",
+        "accepted",
+        "rejected",
+      ],
+      default: "draft",
+    },
     progress: { type: Number, default: 0 },
     timeline: {
       submitted: { type: Boolean, default: false },
@@ -89,8 +109,12 @@ const applicationSchema = new Schema<IApplication>(
       finalDecision: { type: Boolean, default: false },
     },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    userId: { type: Schema.Types.ObjectId, ref: "User" }, // ✅ Champ ajouté au Schema Mongoose
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-export const Application = model<IApplication>("Application", applicationSchema);
+export const Application = model<IApplication>(
+  "Application",
+  applicationSchema,
+);

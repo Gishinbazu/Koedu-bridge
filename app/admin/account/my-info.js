@@ -94,9 +94,24 @@ export default function AdminMyInfoScreen() {
     }
   };
 
+  // 🚪 Fonction de Déconnexion
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem("koedu_user");
+      await AsyncStorage.removeItem("koedu_token"); // Au cas où un jeton JWT est aussi stocké
+      router.replace("/auth/login");
+    } catch (err) {
+      console.log("Logout error:", err);
+      alert("Failed to log out.");
+    }
+  };
+
   if (checkingAdmin) {
     return (
-      <LinearGradient colors={[COLORS.bgStart, COLORS.bgEnd]} style={{ flex: 1 }}>
+      <LinearGradient
+        colors={[COLORS.bgStart, COLORS.bgEnd]}
+        style={{ flex: 1 }}
+      >
         <SafeAreaView
           style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
         >
@@ -137,7 +152,7 @@ export default function AdminMyInfoScreen() {
               style={{ marginLeft: 4 }}
             />
             <View>
-              <Text style={styles.headerTitle}>My informations</Text>
+              <Text style={styles.headerTitle}>My information</Text>
               <Text style={styles.headerSubtitle}>
                 Basic admin profile details
               </Text>
@@ -198,7 +213,9 @@ export default function AdminMyInfoScreen() {
                   size={22}
                   color={COLORS.text}
                 />
-                <Text style={localStyles.settingLabel}>Security and Sign-in</Text>
+                <Text style={localStyles.settingLabel}>
+                  Security and Sign-in
+                </Text>
               </View>
               <Ionicons
                 name="chevron-forward"
@@ -233,11 +250,7 @@ export default function AdminMyInfoScreen() {
               onPress={() => router.push("/admin/account/region-language")}
             >
               <View style={localStyles.rowLeft}>
-                <Ionicons
-                  name="globe-outline"
-                  size={22}
-                  color={COLORS.text}
-                />
+                <Ionicons name="globe-outline" size={22} color={COLORS.text} />
                 <Text style={localStyles.settingLabel}>
                   Country / Region & Language
                 </Text>
@@ -247,6 +260,22 @@ export default function AdminMyInfoScreen() {
                 size={20}
                 color={COLORS.textMuted}
               />
+            </Pressable>
+
+            {/* 🔴 BOUTON LOGOUT */}
+            <Pressable
+              style={({ pressed }) => [
+                localStyles.settingRow,
+                localStyles.logoutRow,
+                pressed && { opacity: 0.7 },
+              ]}
+              onPress={handleLogout}
+            >
+              <View style={localStyles.rowLeft}>
+                <Ionicons name="log-out-outline" size={22} color="#EF4444" />
+                <Text style={localStyles.logoutLabel}>Log out</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#EF4444" />
             </Pressable>
           </View>
 
@@ -270,7 +299,7 @@ function LabeledInput({ label, ...props }) {
   );
 }
 
-// 🎨 Styles locaux pour la section Account Settings
+// 🎨 Styles locaux pour la section Account Settings & Logout
 const localStyles = StyleSheet.create({
   sectionContainer: {
     marginTop: 28,
@@ -297,5 +326,14 @@ const localStyles = StyleSheet.create({
   settingLabel: {
     fontSize: 15,
     color: COLORS.text,
+  },
+  logoutRow: {
+    marginTop: 12,
+    borderBottomWidth: 0, // Supprime la ligne du bas pour mettre en valeur
+  },
+  logoutLabel: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#EF4444", // Couleur rouge d'alerte pour le logout
   },
 });

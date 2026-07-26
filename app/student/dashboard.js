@@ -1,20 +1,35 @@
 // app/student/dashboard.js
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  Linking,
+  Platform,
   Pressable,
   ScrollView,
   Text,
   View,
 } from "react-native";
 
+import { API_BASE_URL } from "../../services/apiClient";
 import { getCurrentUser } from "../../services/authApi";
 import { getStudentApplication } from "../../services/userApi";
 import LogoutButton from "../auth/LogoutButton";
 
 import styles, { COLORS } from "../../styles/student/dashboard.styles";
+
+// ---------- HELPERS ----------
+function ensureAbsoluteUrl(maybeUrl) {
+  if (!maybeUrl || typeof maybeUrl !== "string") return null;
+  if (maybeUrl.startsWith("http://") || maybeUrl.startsWith("https://")) {
+    return maybeUrl;
+  }
+  if (maybeUrl.startsWith("/")) {
+    return `${API_BASE_URL}${maybeUrl}`;
+  }
+  return `${API_BASE_URL}/${maybeUrl}`;
+}
 
 // ---------- Back Button ----------
 function BackButton() {
@@ -31,7 +46,7 @@ function BackButton() {
         alignItems: "center",
         gap: 6,
         borderRadius: 999,
-        backgroundColor: "rgba(15,23,42,0.9)", // petite pill sombre
+        backgroundColor: "rgba(15,23,42,0.9)",
         marginRight: 15,
       }}
     >
@@ -49,7 +64,6 @@ function BackButton() {
   );
 }
 
-// Lignes simples
 function SummaryItem({ label, value }) {
   return (
     <View style={styles.summaryRow}>
@@ -59,7 +73,6 @@ function SummaryItem({ label, value }) {
   );
 }
 
-// Lignes type “summary.js”
 function DetailRow({ label, value }) {
   return (
     <View style={styles.detailsRow}>
@@ -69,20 +82,62 @@ function DetailRow({ label, value }) {
   );
 }
 
-// Documents
-function DocumentItem({ label, fileName }) {
-  const hasFile = !!fileName;
+function DocumentItem({ label, fileName, fileUrl }) {
+  const hasFile = Boolean(fileName || fileUrl);
+  const fullUrl = ensureAbsoluteUrl(
+    fileUrl || (fileName ? `/uploads/${fileName}` : null),
+  );
+
+  const handleOpenDoc = () => {
+    if (!fullUrl) return;
+    if (Platform.OS === "web") {
+      window.open(fullUrl, "_blank");
+    } else {
+      Linking.openURL(fullUrl);
+    }
+  };
+
   return (
     <View style={styles.documentRow}>
-      <Text style={styles.documentName}>{label}</Text>
-      <Text
-        style={[
-          styles.documentStatus,
-          { color: hasFile ? "#4ade80" : "#f97316" },
-        ]}
-      >
-        {hasFile ? fileName : "Not uploaded"}
-      </Text>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.documentName}>{label}</Text>
+        <Text
+          style={[
+            styles.documentStatus,
+            { color: hasFile ? "#4ade80" : "#f97316" },
+          ]}
+          numberOfLines={1}
+        >
+          {hasFile ? fileName || "Uploaded Document" : "Not uploaded"}
+        </Text>
+      </View>
+
+      {hasFile && fullUrl ? (
+        <Pressable
+          onPress={handleOpenDoc}
+          style={({ pressed }) => [
+            {
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 4,
+              backgroundColor: "rgba(249, 115, 22, 0.15)",
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: "rgba(249, 115, 22, 0.3)",
+            },
+            pressed && { opacity: 0.8 },
+          ]}
+        >
+          <Ionicons name="eye-outline" size={14} color={COLORS.primary} />
+          <Text
+            style={{ color: COLORS.primary, fontSize: 11, fontWeight: "700" }}
+          >
+            View
+          </Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -105,24 +160,54 @@ export default function StudentDashboard() {
   const [app, setApp] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [me, appRes] = await Promise.all([
-          getCurrentUser(),
-          getStudentApplication(),
-        ]);
+  // 🔄 Chargement des données à CHAQUE FOIS que l'écran reprend le focus
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
 
-        // 🔥 on prend directement ce que renvoie l’API
-        setUser(me?.user || me);
-        setApp(appRes);
-      } catch (e) {
-        console.log("Error loading student dashboard:", e);
-      } finally {
-        setLoading(false);
+      async function loadDashboardData() {
+        try {
+          console.log("🔄 Re-fetching latest student application data...");
+          const [me, appRes] = await Promise.all([
+            getCurrentUser(),
+            getStudentApplication(),
+          ]);
+
+          if (!alive) return;
+
+          setUser(me?.user || me);
+          const applicationData = appRes?.application || appRes;
+          setApp(applicationData);
+        } catch (e) {
+          console.log("Error loading student dashboard:", e);
+        } finally {
+          if (alive) setLoading(false);
+        }
       }
-    })();
-  }, []);
+
+      loadDashboardData();
+
+      return () => {
+        alive = false;
+      };
+    }, []),
+  );
+
+  const handleEditApplication = () => {
+    if (!app) {
+      router.push("/apply");
+      return;
+    }
+
+    const appId = app.koeduId || app._id || app.id;
+    const track = (app.programType || app.track || "language").toLowerCase();
+
+    if (appId) {
+      router.push(`/apply/${track}/${appId}`);
+    } else {
+      router.push("/apply");
+    }
+  };
 
   if (loading) {
     return (
@@ -132,7 +217,6 @@ export default function StudentDashboard() {
     );
   }
 
-  // si pas encore d'application
   if (!app) {
     return (
       <ScrollView style={styles.container}>
@@ -167,7 +251,6 @@ export default function StudentDashboard() {
     );
   }
 
-  // Données pour affichage
   const progress = app.progress || 25;
   const status = app.status || "pending";
 
@@ -189,27 +272,15 @@ export default function StudentDashboard() {
 
       {/* LAYOUT : sidebar gauche + contenu droite */}
       <View style={styles.mainRow}>
-        {/* ====== NAV GAUCHE ====== */}
+        {/* NAV GAUCHE */}
         <View style={styles.sideNav}>
           <Text style={styles.sideNavTitle}>My KOEDU</Text>
 
-          {/* Edit Application → renvoie vers le même flux que /apply/language/[id] */}
-          <Pressable
-            style={styles.sideNavBtn}
-            onPress={() => {
-              if (app.koeduId) {
-                // ex: /apply/language/sunmoon-2026-lang-1y
-                router.push(`/apply/language/${app.koeduId}`);
-              } else {
-                router.push("/apply");
-              }
-            }}
-          >
+          <Pressable style={styles.sideNavBtn} onPress={handleEditApplication}>
             <Ionicons name="create-outline" size={20} color={COLORS.primary} />
             <Text style={styles.sideNavBtnText}>Edit Application</Text>
           </Pressable>
 
-          {/* My Profile */}
           <Pressable
             style={styles.sideNavBtn}
             onPress={() => router.push("/student/applications/profile")}
@@ -219,28 +290,19 @@ export default function StudentDashboard() {
           </Pressable>
         </View>
 
-        {/* ====== COLONNE PRINCIPALE ====== */}
+        {/* COLONNE PRINCIPALE */}
         <View style={styles.mainColumn}>
           {/* STATUS + TIMELINE */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Application Status</Text>
 
             <View style={styles.statusBox}>
-              <Ionicons
-                name="time-outline"
-                size={22}
-                color={COLORS.primary}
-              />
-              <Text style={styles.statusText}>{status}</Text>
+              <Ionicons name="time-outline" size={22} color={COLORS.primary} />
+              <Text style={styles.statusText}>{status.toUpperCase()}</Text>
             </View>
 
             <View style={styles.progressBar}>
-              <View
-                style={[
-                  styles.progressFill,
-                  { width: `${progress}%` },
-                ]}
-              />
+              <View style={[styles.progressFill, { width: `${progress}%` }]} />
             </View>
             <Text style={styles.progressLabel}>{progress}% Completed</Text>
 
@@ -295,7 +357,7 @@ export default function StudentDashboard() {
             )}
           </View>
 
-          {/* SUMMARY HAUT NIVEAU */}
+          {/* SUMMARY */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Application Summary</Text>
 
@@ -303,7 +365,7 @@ export default function StudentDashboard() {
             <SummaryItem label="Program" value={app.programName} />
             <SummaryItem
               label="Program type"
-              value={app.programTypeLabel}
+              value={app.programTypeLabel || app.programType}
             />
             <SummaryItem
               label="University"
@@ -318,13 +380,10 @@ export default function StudentDashboard() {
             </View>
           </View>
 
-          {/* 🤝 SECTION QUI COPIE summary.js */}
+          {/* APPLICATION DETAILS */}
           <View style={styles.card}>
-            <Text className="card-title" style={styles.cardTitle}>
-              Application Details
-            </Text>
+            <Text style={styles.cardTitle}>Application Details</Text>
 
-            {/* Personal details */}
             <Text style={styles.detailsGroupTitle}>Personal details</Text>
             <DetailRow label="Full name" value={app.fullName} />
             <DetailRow label="Nationality" value={app.nationality} />
@@ -332,12 +391,10 @@ export default function StudentDashboard() {
             <DetailRow label="Email" value={app.email} />
             <DetailRow label="Phone" value={app.phone} />
 
-            {/* Education */}
             <Text style={styles.detailsGroupTitle}>Education</Text>
             <DetailRow label="Last school" value={app.lastSchool} />
             <DetailRow label="Major / Stream" value={app.major} />
 
-            {/* Financial sponsor */}
             <Text style={styles.detailsGroupTitle}>Financial sponsor</Text>
             <DetailRow
               label="Bank account owner"
@@ -347,37 +404,39 @@ export default function StudentDashboard() {
                   : "Student (self)"
               }
             />
-            <DetailRow
-              label="Required balance"
-              value="USD 20,000 or more"
-            />
+            <DetailRow label="Required balance" value="USD 20,000 or more" />
           </View>
 
-          {/* Documents – même logique que FileRow dans summary.js */}
+          {/* UPLOADED DOCUMENTS */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Uploaded documents</Text>
 
             <DocumentItem
               label="Passport"
               fileName={app.passportName}
+              fileUrl={app.passportUrl || app.passport}
             />
             <DocumentItem
               label="Transcript"
               fileName={app.transcriptName}
+              fileUrl={app.transcriptUrl || app.transcript}
             />
             <DocumentItem
               label="Bank balance certificate"
               fileName={app.bankStatementName}
+              fileUrl={app.bankStatementUrl || app.bankStatement}
             />
             {app.sponsor === "parents" && (
               <DocumentItem
                 label="Family relation certificate"
                 fileName={app.familyCertificateName}
+                fileUrl={app.familyCertificateUrl || app.familyCertificate}
               />
             )}
             <DocumentItem
               label="ID Photo"
               fileName={app.photoName}
+              fileUrl={app.photoUrl || app.photo}
             />
           </View>
 
@@ -400,7 +459,7 @@ export default function StudentDashboard() {
             )}
           </View>
 
-          {/* Quick actions bas (sans My Profile, déjà à gauche) */}
+          {/* Quick actions */}
           <View style={styles.actions}>
             <QuickAction
               label="Upload Documents"
@@ -412,17 +471,10 @@ export default function StudentDashboard() {
               icon="receipt-outline"
               onPress={() => router.push("/student/applications/dashboard")}
             />
-            {/* ➕ NEW: open Apply Hub / Edit */}
             <QuickAction
               label="Edit Application"
               icon="create-outline"
-              onPress={() => {
-                if (app.koeduId) {
-                  router.push(`/apply/language/${app.koeduId}`);
-                } else {
-                  router.push("/apply");
-                }
-              }}
+              onPress={handleEditApplication}
             />
           </View>
 

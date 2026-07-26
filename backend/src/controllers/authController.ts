@@ -11,7 +11,10 @@ const createToken = (userId: string, role: string) => {
   return jwt.sign({ userId, role }, JWT_SECRET, { expiresIn: "7d" });
 };
 
-// ------------------- REGISTER -------------------
+/* ==========================================================
+   REGISTER USER (Student)
+   POST /api/auth/register
+   ========================================================== */
 export const register = async (req: Request, res: Response) => {
   try {
     const { username, email, password } = req.body;
@@ -22,7 +25,10 @@ export const register = async (req: Request, res: Response) => {
         .json({ message: "Username, email and password are required." });
     }
 
-    const existing = await User.findOne({ email });
+    const emailClean = email.trim().toLowerCase();
+    const usernameClean = username.trim();
+
+    const existing = await User.findOne({ email: emailClean });
     if (existing) {
       return res.status(409).json({ message: "Email already in use." });
     }
@@ -30,15 +36,18 @@ export const register = async (req: Request, res: Response) => {
     const hashed = await bcrypt.hash(password, 10);
 
     const user: any = await User.create({
-      username,
-      email,
+      username: usernameClean,
+      email: emailClean,
       password: hashed,
       role: "student",
     });
 
     const token = createToken(user._id.toString(), user.role || "student");
 
+    console.log("✅ Inscription réussie pour :", user.email);
+
     return res.status(201).json({
+      success: true,
       token,
       user: {
         id: user._id,
@@ -55,7 +64,10 @@ export const register = async (req: Request, res: Response) => {
   }
 };
 
-// ------------------- LOGIN -------------------
+/* ==========================================================
+   LOGIN USER
+   POST /api/auth/login
+   ========================================================== */
 export const login = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
@@ -66,36 +78,44 @@ export const login = async (req: Request, res: Response) => {
         .json({ message: "Email and password are required." });
     }
 
-    const user: any = await User.findOne({ email });
+    // 1. Nettoyage de l'email pour éviter les soucis de casse
+    const emailClean = email.trim().toLowerCase();
+
+    // 2. Recherche avec sélection forcée du champ password (même s'il est masqué dans le schéma)
+    const user: any = await User.findOne({ email: emailClean }).select(
+      "+password",
+    );
+
     if (!user) {
-      return res
-        .status(401)
-        .json({ message: "Invalid email or password." });
+      console.warn("⚠️ Connexion échouée : Email non trouvé ->", emailClean);
+      return res.status(401).json({ message: "Invalid email or password." });
     }
 
-    const storedHash: string | undefined =
-      user.password || user.passwordHash;
+    const storedHash: string | undefined = user.password || user.passwordHash;
 
     if (!storedHash) {
-      console.error("User has no password hash stored", {
-        id: user._id,
-        email: user.email,
-      });
-      return res
-        .status(401)
-        .json({ message: "Invalid email or password." });
+      console.error("⚠️ Mot de passe absent pour l'utilisateur :", emailClean);
+      return res.status(401).json({ message: "Invalid email or password." });
     }
 
+    // 3. Comparaison sécurisée du hash avec bcrypt
     const match = await bcrypt.compare(password, storedHash);
+
     if (!match) {
-      return res
-        .status(401)
-        .json({ message: "Invalid email or password." });
+      console.warn(
+        "⚠️ Connexion échouée : Mot de passe incorrect pour ->",
+        emailClean,
+      );
+      return res.status(401).json({ message: "Invalid email or password." });
     }
 
+    // 4. Génération du jeton JWT
     const token = createToken(user._id.toString(), user.role || "student");
 
+    console.log("✅ Connexion réussie pour :", user.email);
+
     return res.json({
+      success: true,
       token,
       user: {
         id: user._id,
@@ -105,30 +125,35 @@ export const login = async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error("Login error:", error);
+    console.error("❌ Login error:", error);
     return res
       .status(500)
       .json({ message: "Server error", error: error.message });
   }
 };
 
-// ------------------- GET /api/auth/me -------------------
+/* ==========================================================
+   GET CURRENT USER
+   GET /api/auth/me
+   ========================================================== */
 export const getMe = async (req: AuthRequest, res: Response) => {
   try {
     if (!req.user) {
       return res.status(401).json({ message: "Not authenticated" });
     }
 
-    // ✅ ton middleware met probablement `req.user.id`
-    const user = await User.findById(req.user.id).select(
-      "_id username email role createdAt"
+    // Récupération souple de l'ID depuis req.user
+    const userId = req.user._id || req.user.id;
+
+    const user = await User.findById(userId).select(
+      "_id username email role createdAt",
     );
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    return res.json({ user });
+    return res.json({ success: true, user });
   } catch (error: any) {
     console.error("getMe error:", error);
     return res

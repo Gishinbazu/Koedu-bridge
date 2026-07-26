@@ -5,18 +5,18 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    FlatList,
-    Platform,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  FlatList,
+  Linking,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
-
 import { API_BASE_URL } from "../../../services/apiClient";
 import { fetchAllApplicationsAdmin } from "../../../services/applicationsApi";
 
@@ -33,6 +33,7 @@ const COLORS = {
   badgeReview: "#3B82F6",
   badgeAccepted: "#22C55E",
   badgeRejected: "#EF4444",
+  pdfColor: "#38BDF8", // Couleur accentuée pour les PDF
 };
 
 const STATUS_LABELS = {
@@ -67,11 +68,9 @@ function formatDate(dateStr) {
 
 export default function AdminApplicationsIndex() {
   const router = useRouter();
-
   const [checkingAdmin, setCheckingAdmin] = useState(true);
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
-
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
@@ -92,7 +91,7 @@ export default function AdminApplicationsIndex() {
           return;
         }
       } catch (e) {
-        console.log("Admin guard (applications) error:", e.message);
+        console.log("Admin guard error:", e.message);
         router.replace("/");
       } finally {
         setCheckingAdmin(false);
@@ -125,16 +124,18 @@ export default function AdminApplicationsIndex() {
     return applications
       .filter((app) => {
         if (statusFilter !== "all" && app.status !== statusFilter) return false;
-        if (typeFilter !== "all" && app.programType !== typeFilter) return false;
+        if (typeFilter !== "all" && app.programType !== typeFilter)
+          return false;
 
         if (!q) return true;
 
-        const blob = `${app.fullName} ${app.programName} ${app.programId} ${app.email} ${app.nationality}`.toLowerCase();
+        const blob =
+          `${app.fullName} ${app.programName} ${app.programId} ${app.email} ${app.nationality}`.toLowerCase();
         return blob.includes(q);
       })
       .sort(
         (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       );
   }, [applications, search, statusFilter, typeFilter]);
 
@@ -142,6 +143,17 @@ export default function AdminApplicationsIndex() {
     const id = item._id || item.id;
     if (!id) return;
     router.push(`/admin/applications/${id}`);
+  };
+
+  // ----- OUVRIR UN PDF DIRECTEMENT -----
+  const handleOpenPdf = (url) => {
+    if (!url) return;
+    const fullUrl = url.startsWith("http") ? url : `${API_BASE_URL}${url}`;
+    if (Platform.OS === "web") {
+      window.open(fullUrl, "_blank");
+    } else {
+      Linking.openURL(fullUrl);
+    }
   };
 
   // ----- EXPORT CSV -----
@@ -165,14 +177,10 @@ export default function AdminApplicationsIndex() {
       if (Platform.OS === "web") {
         const res = await fetch(url, {
           method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         });
 
-        if (!res.ok) {
-          throw new Error(`Export failed: HTTP ${res.status}`);
-        }
+        if (!res.ok) throw new Error(`Export failed: HTTP ${res.status}`);
 
         const blob = await res.blob();
         const downloadUrl = window.URL.createObjectURL(blob);
@@ -184,20 +192,8 @@ export default function AdminApplicationsIndex() {
         a.remove();
         window.URL.revokeObjectURL(downloadUrl);
       } else {
-        // Mobile / native : on appelle l'export, et on informe l'admin
-        const res = await fetch(url, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!res.ok) {
-          throw new Error(`Export failed: HTTP ${res.status}`);
-        }
-
         alert(
-          "Export generated.\nFor now, please open the admin dashboard in a web browser to download the file."
+          "Export generated.\nPlease open the admin dashboard in a web browser to download.",
         );
       }
     } catch (err) {
@@ -210,7 +206,10 @@ export default function AdminApplicationsIndex() {
 
   if (checkingAdmin) {
     return (
-      <LinearGradient colors={[COLORS.bgStart, COLORS.bgEnd]} style={{ flex: 1 }}>
+      <LinearGradient
+        colors={[COLORS.bgStart, COLORS.bgEnd]}
+        style={{ flex: 1 }}
+      >
         <SafeAreaView
           style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
         >
@@ -229,7 +228,6 @@ export default function AdminApplicationsIndex() {
         {/* HEADER */}
         <View style={styles.header}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            {/* 🔙 Bouton arrière */}
             <Pressable
               onPress={() => router.back()}
               style={({ pressed }) => [
@@ -260,7 +258,6 @@ export default function AdminApplicationsIndex() {
             </View>
           </View>
 
-          {/* 🔁 Bouton pour aller au dashboard admin */}
           <View style={styles.headerActionsRow}>
             <Pressable
               onPress={() => router.push("/admin/dashboard")}
@@ -284,9 +281,8 @@ export default function AdminApplicationsIndex() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          {/* CARD : FILTRES / SEARCH */}
+          {/* SEARCH & FILTERS */}
           <View style={styles.filtersCard}>
-            {/* SEARCH */}
             <View style={styles.searchRow}>
               <Ionicons
                 name="search"
@@ -304,7 +300,6 @@ export default function AdminApplicationsIndex() {
               />
             </View>
 
-            {/* FILTERS */}
             <View style={styles.filtersRow}>
               <FilterGroup
                 label="Status"
@@ -332,7 +327,7 @@ export default function AdminApplicationsIndex() {
             </View>
           </View>
 
-          {/* LISTE DES APPLICATIONS */}
+          {/* LISTE DES CANDIDATURES */}
           <View style={styles.listCard}>
             <View style={styles.listHeader}>
               <View>
@@ -387,41 +382,82 @@ export default function AdminApplicationsIndex() {
                 keyExtractor={(item) => item._id || item.id}
                 scrollEnabled={false}
                 ItemSeparatorComponent={() => <View style={styles.separator} />}
-                renderItem={({ item }) => (
-                  <Pressable
-                    onPress={() => handleOpenApplication(item)}
-                    style={({ pressed }) => [
-                      styles.appRow,
-                      pressed && { backgroundColor: "rgba(15,23,42,0.9)" },
-                    ]}
-                  >
-                    {/* LEFT : Nom + Programme */}
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.appName}>{item.fullName}</Text>
-                      <Text style={styles.appProgram} numberOfLines={1}>
-                        {TYPE_LABELS[item.programType] || "Program"} ·{" "}
-                        {item.programName}
-                      </Text>
-                      <Text style={styles.appMeta} numberOfLines={1}>
-                        {item.nationality} · {item.email}
-                      </Text>
-                    </View>
+                renderItem={({ item }) => {
+                  // Compte des documents PDF joints
+                  const docsList = item.documents
+                    ? Array.isArray(item.documents)
+                      ? item.documents
+                      : Object.values(item.documents)
+                    : [];
+                  const pdfCount = docsList.filter(Boolean).length;
 
-                    {/* RIGHT : date + status + chevron */}
-                    <View style={styles.appRight}>
-                      <Text style={styles.dateText}>
-                        {formatDate(item.createdAt)}
-                      </Text>
-                      <StatusBadge status={item.status} />
-                      <Ionicons
-                        name="chevron-forward"
-                        size={18}
-                        color={COLORS.textMuted}
-                        style={{ marginLeft: 4 }}
-                      />
-                    </View>
-                  </Pressable>
-                )}
+                  return (
+                    <Pressable
+                      onPress={() => handleOpenApplication(item)}
+                      style={({ pressed }) => [
+                        styles.appRow,
+                        pressed && { backgroundColor: "rgba(15,23,42,0.9)" },
+                      ]}
+                    >
+                      {/* GAUCHE : Infos Étudiant */}
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.appName}>{item.fullName}</Text>
+                        <Text style={styles.appProgram} numberOfLines={1}>
+                          {TYPE_LABELS[item.programType] || "Program"} ·{" "}
+                          {item.programName}
+                        </Text>
+                        <Text style={styles.appMeta} numberOfLines={1}>
+                          {item.nationality} · {item.email}
+                        </Text>
+
+                        {/* BADGE DES PDFS DISPONIBLES */}
+                        {pdfCount > 0 ? (
+                          <View style={styles.pdfBadgeRow}>
+                            <Ionicons
+                              name="document-text"
+                              size={12}
+                              color={COLORS.pdfColor}
+                            />
+                            <Text style={styles.pdfBadgeText}>
+                              {pdfCount} PDF document{pdfCount > 1 ? "s" : ""}{" "}
+                              attached
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
+
+                      {/* DROITE : Statut + Date + Action */}
+                      <View style={styles.appRight}>
+                        <Text style={styles.dateText}>
+                          {formatDate(item.createdAt)}
+                        </Text>
+                        <StatusBadge status={item.status} />
+
+                        {/* BOUTON RAPIDE SI PDF UNIQUE */}
+                        {pdfCount === 1 && docsList[0] ? (
+                          <Pressable
+                            onPress={() => handleOpenPdf(docsList[0])}
+                            style={styles.quickPdfBtn}
+                          >
+                            <Ionicons
+                              name="eye-outline"
+                              size={14}
+                              color={COLORS.pdfColor}
+                            />
+                            <Text style={styles.quickPdfText}>PDF</Text>
+                          </Pressable>
+                        ) : (
+                          <Ionicons
+                            name="chevron-forward"
+                            size={18}
+                            color={COLORS.textMuted}
+                            style={{ marginTop: 6 }}
+                          />
+                        )}
+                      </View>
+                    </Pressable>
+                  );
+                }}
               />
             )}
           </View>
@@ -433,8 +469,7 @@ export default function AdminApplicationsIndex() {
   );
 }
 
-/* ───────── Small components ───────── */
-
+/* ───────── Petit composants ───────── */
 function FilterGroup({ label, options, active, onChange }) {
   return (
     <View style={styles.filterGroup}>
@@ -449,10 +484,7 @@ function FilterGroup({ label, options, active, onChange }) {
               style={[styles.chip, isActive && styles.chipActive]}
             >
               <Text
-                style={[
-                  styles.chipText,
-                  isActive && styles.chipTextActive,
-                ]}
+                style={[styles.chipText, isActive && styles.chipTextActive]}
               >
                 {opt.label}
               </Text>
@@ -475,7 +507,6 @@ function StatusBadge({ status }) {
 }
 
 /* ───────── Styles ───────── */
-
 const styles = StyleSheet.create({
   header: {
     paddingTop: Platform.OS === "android" ? 40 : 10,
@@ -497,16 +528,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginLeft: 4,
   },
-  headerTitle: {
-    color: COLORS.text,
-    fontSize: 18,
-    fontWeight: "800",
-  },
-  headerSubtitle: {
-    color: COLORS.textMuted,
-    fontSize: 12,
-    marginTop: 4,
-  },
+  headerTitle: { color: COLORS.text, fontSize: 18, fontWeight: "800" },
+  headerSubtitle: { color: COLORS.textMuted, fontSize: 12, marginTop: 4 },
   headerActionsRow: {
     marginTop: 10,
     flexDirection: "row",
@@ -520,17 +543,8 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: COLORS.primary,
   },
-  dashboardButtonText: {
-    color: "#0b1120",
-    fontSize: 12,
-    fontWeight: "800",
-  },
-
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-
+  dashboardButtonText: { color: "#0b1120", fontSize: 12, fontWeight: "800" },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
   filtersCard: {
     backgroundColor: COLORS.cardBg,
     borderRadius: 18,
@@ -549,21 +563,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(148,163,184,0.6)",
   },
-  searchInput: {
-    flex: 1,
-    color: COLORS.text,
-    fontSize: 13,
-  },
+  searchInput: { flex: 1, color: COLORS.text, fontSize: 13 },
   filtersRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12,
     marginTop: 12,
   },
-  filterGroup: {
-    flex: 1,
-    minWidth: 140,
-  },
+  filterGroup: { flex: 1, minWidth: 140 },
   filterLabel: {
     color: COLORS.textMuted,
     fontSize: 11,
@@ -571,11 +578,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.6,
   },
-  filterChipsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
+  filterChipsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -584,20 +587,9 @@ const styles = StyleSheet.create({
     borderColor: "rgba(148,163,184,0.5)",
     backgroundColor: "#020617",
   },
-  chipActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  chipText: {
-    color: COLORS.textMuted,
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  chipTextActive: {
-    color: "#111827",
-    fontWeight: "800",
-  },
-
+  chipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  chipText: { color: COLORS.textMuted, fontSize: 11, fontWeight: "600" },
+  chipTextActive: { color: "#111827", fontWeight: "800" },
   listCard: {
     backgroundColor: COLORS.cardBg,
     borderRadius: 18,
@@ -612,16 +604,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     paddingHorizontal: 4,
   },
-  listTitle: {
-    color: COLORS.text,
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  listCount: {
-    color: COLORS.textMuted,
-    fontSize: 12,
-  },
-
+  listTitle: { color: COLORS.text, fontSize: 15, fontWeight: "700" },
+  listCount: { color: COLORS.textMuted, fontSize: 12 },
   exportButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -632,12 +616,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     backgroundColor: "rgba(15,23,42,0.95)",
   },
-  exportButtonText: {
-    color: COLORS.text,
-    fontSize: 11,
-    fontWeight: "700",
-  },
-
+  exportButtonText: { color: COLORS.text, fontSize: 11, fontWeight: "700" },
   appRow: {
     flexDirection: "row",
     paddingVertical: 10,
@@ -650,30 +629,18 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(30,64,175,0.4)",
     marginHorizontal: 6,
   },
-  appName: {
-    color: COLORS.text,
-    fontSize: 14,
-    fontWeight: "700",
+  appName: { color: COLORS.text, fontSize: 14, fontWeight: "700" },
+  appProgram: { color: COLORS.textMuted, fontSize: 12, marginTop: 2 },
+  appMeta: { color: COLORS.textMuted, fontSize: 11, marginTop: 1 },
+  pdfBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 4,
   },
-  appProgram: {
-    color: COLORS.textMuted,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  appMeta: {
-    color: COLORS.textMuted,
-    fontSize: 11,
-    marginTop: 1,
-  },
-  appRight: {
-    alignItems: "flex-end",
-    marginLeft: 10,
-  },
-  dateText: {
-    color: COLORS.textMuted,
-    fontSize: 11,
-    marginBottom: 4,
-  },
+  pdfBadgeText: { color: COLORS.pdfColor, fontSize: 11, fontWeight: "600" },
+  appRight: { alignItems: "flex-end", marginLeft: 10 },
+  dateText: { color: COLORS.textMuted, fontSize: 11, marginBottom: 4 },
   statusBadge: {
     borderRadius: 999,
     paddingHorizontal: 10,
@@ -687,17 +654,21 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     textTransform: "uppercase",
   },
-
-  emptyState: {
+  quickPdfBtn: {
+    flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 30,
-    gap: 4,
+    gap: 3,
+    marginTop: 6,
+    backgroundColor: "rgba(56,189,248,0.15)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "rgba(56,189,248,0.3)",
   },
-  emptyTitle: {
-    color: COLORS.text,
-    fontSize: 14,
-    fontWeight: "700",
-  },
+  quickPdfText: { color: COLORS.pdfColor, fontSize: 10, fontWeight: "700" },
+  emptyState: { alignItems: "center", paddingVertical: 30, gap: 4 },
+  emptyTitle: { color: COLORS.text, fontSize: 14, fontWeight: "700" },
   emptyText: {
     color: COLORS.textMuted,
     fontSize: 12,
@@ -705,4 +676,3 @@ const styles = StyleSheet.create({
     maxWidth: 260,
   },
 });
-

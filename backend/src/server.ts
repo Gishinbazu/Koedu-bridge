@@ -1,4 +1,3 @@
-// src/server.ts
 import cors from "cors";
 import "dotenv/config";
 import express from "express";
@@ -10,17 +9,15 @@ import connectDB from "./config/db";
 import { ensureUploads } from "./utils/ensureUploads";
 
 // Routes
+import adminRoutes from "./routes/admin.routes";
+import adminAccountRoutes from "./routes/adminAccount.routes";
+import adminMetricsRoutes from "./routes/adminMetrics.routes";
+import applicationRoutes from "./routes/application.routes";
+import applicationUploadRoutes from "./routes/applicationUpload.routes";
 import authRoutes from "./routes/authRoutes";
 import programRoutes from "./routes/program.routes";
 import studentRoutes from "./routes/student.routes";
 import userRoutes from "./routes/user.routes";
-
-import applicationRoutes from "./routes/application.routes";
-import applicationUploadRoutes from "./routes/applicationUpload.routes"; // ✅ Upload des documents
-
-import adminRoutes from "./routes/admin.routes";
-import adminAccountRoutes from "./routes/adminAccount.routes";
-import adminMetricsRoutes from "./routes/adminMetrics.routes";
 
 // Controllers / Middlewares
 import { getMe } from "./controllers/authController";
@@ -30,7 +27,7 @@ import { errorHandler } from "./middleware/error.middleware";
 const app = express();
 const PORT = Number(process.env.PORT || 8000);
 
-// ✅ Création des dossiers de base (uploads/applications) avant de lancer les routes
+// ✅ Création des dossiers de base (uploads/applications)
 ensureUploads();
 
 /* --------------------------------------------------
@@ -38,17 +35,16 @@ ensureUploads();
 --------------------------------------------------- */
 app.use(
   cors({
-    origin: true, // Ou ton URL frontend (ex: http://localhost:3000)
+    origin: true,
     credentials: true,
-  })
+  }),
 );
 
-// Configuration Helmet pour autoriser l'affichage des PDF/Images du serveur
 app.use(
   helmet({
-    crossOriginResourcePolicy: false, 
-    contentSecurityPolicy: false, // Utile si tu as des problèmes de chargement de PDF sur certains navigateurs
-  })
+    crossOriginResourcePolicy: false,
+    contentSecurityPolicy: false,
+  }),
 );
 
 app.use(morgan("dev"));
@@ -57,7 +53,6 @@ app.use(express.urlencoded({ extended: true }));
 
 /* --------------------------------------------------
    ✅ FICHIERS STATIQUES (Accès public aux documents)
-   Exemple: http://localhost:8000/uploads/applications/[appId]/passport/xxx.pdf
 --------------------------------------------------- */
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
@@ -81,14 +76,12 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.get("/api/users/me", requireAuth, getMe);
 
-// --- PROGRAMMES ---
+// --- PROGRAMMES (Public & Admin Routes) ---
 app.use("/api/programs", programRoutes);
+app.use("/api/admin/programs", programRoutes); // 👈 Mounts programRoutes directly for /api/admin/programs
 
-// --- APPLICATIONS (GESTION CRUD) ---
+// --- APPLICATIONS (GESTION CRUD & UPLOADS) ---
 app.use("/api/applications", applicationRoutes);
-
-// --- APPLICATIONS (DOCUMENTS / PDF) ---
-// Utilise le même préfixe, Express dispatchera vers le POST /:id/documents
 app.use("/api/applications", applicationUploadRoutes);
 
 // --- ADMINISTRATION ---
@@ -100,7 +93,7 @@ app.use("/api/admin/account", adminAccountRoutes);
 app.use("/api/student", studentRoutes);
 
 /* --------------------------------------------------
-   ❌ GESTIONNAIRE D'ERREURS GLOBAL (TOUJOURS EN DERNIER)
+   ❌ GESTIONNAIRE D'ERREURS GLOBAL
 --------------------------------------------------- */
 app.use(errorHandler);
 
@@ -109,10 +102,11 @@ app.use(errorHandler);
 --------------------------------------------------- */
 connectDB()
   .then(() => {
-    // 0.0.0.0 permet l'accès depuis d'autres appareils sur le réseau local (ex: test sur mobile)
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`🚀 Serveur démarré sur : http://localhost:${PORT}`);
-      console.log(`📂 Dossier uploads : ${path.join(process.cwd(), "uploads")}`);
+      console.log(
+        `📂 Dossier uploads : ${path.join(process.cwd(), "uploads")}`,
+      );
     });
   })
   .catch((err) => {
